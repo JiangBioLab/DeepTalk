@@ -5,8 +5,10 @@
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
+import DeepTalk_ST
 
-project = 'DeepTalktest'
+
+project = 'DeepTalk_ST'
 copyright = '2023, wenyiyang'
 author = 'wenyiyang'
 release = '0.0.1'
