@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 DEEPTALK
-
+==========================
 Deciphering cell-cell communication from spatially resolved transcriptomic data at single-cell resolution with subgraph-based attentional graph neural network
 
 .. image:: Fig1-3.png
