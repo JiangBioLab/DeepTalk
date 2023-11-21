@@ -1,6 +1,7 @@
-Tutorials
-=========
+.. _tutorials:
 
-.. toctree::
-   notebooks/Adult_mouse_brain
-   notebooks/VISP_MER_test
+Tutorials
+====================
+.. nbgallery::
+    tutorial_link
+    tutorial_sq_link
