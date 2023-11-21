@@ -68,6 +68,9 @@ Use subgraph-based graph attention network to construct CCC networks for the lig
     cccpre = dt.CCC_Predict(data_name,
     data_path,outdir, Fea_embeddings)
 ```
+## Documentation
+
+See detailed documentation and examples at [https://deeptalk.readthedocs.io/en/latest/index.html](https://deeptalk.readthedocs.io/en/latest/index.html).
 
 ## Contact
 
