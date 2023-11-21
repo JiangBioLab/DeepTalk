@@ -13,6 +13,7 @@ Deciphering cell-cell communication from spatially resolved transcriptomic data 
 
 .. toctree::
    :maxdepth: 1
+   :hidden:
    
    installation
    tutorials
