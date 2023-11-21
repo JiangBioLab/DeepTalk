@@ -171,7 +171,7 @@ tifffile==2023.7.10
 tinycss2==1.2.1
 tomli==2.0.1
 toolz==0.12.0
-torch==1.8.1+cu111
+torch==1.8.1
 torch-cluster @ https://data.pyg.org/whl/torch-1.8.0%2Bcu111/torch_cluster-1.5.9-cp38-cp38-linux_x86_64.whl#sha256=51db9940b84d25139bd2dbd081a3cb03cb455adf84223d27fed4304420a581c3
 torch-scatter @ https://data.pyg.org/whl/torch-1.8.0%2Bcu111/torch_scatter-2.0.7-cp38-cp38-linux_x86_64.whl#sha256=e94b3127be456baffffa91dce7d46360395d264f3fdead46722b6f3db727ce8c
 torch-sparse @ https://data.pyg.org/whl/torch-1.8.0%2Bcu111/torch_sparse-0.6.10-cp38-cp38-linux_x86_64.whl#sha256=8ea41e10f0b45f57501432d07c1eee2abc90f45f4f01dd11b2cb9d4928fc4b1f
