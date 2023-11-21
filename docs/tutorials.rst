@@ -1,7 +1,6 @@
-.. _tutorials:
-
 Tutorials
-====================
-.. nbgallery::
-    tutorial_link
-    tutorial_sp_link
+=========
+
+.. toctree::
+   notebooks/Basic_usage
+   notebooks/visium-mouse_brain
