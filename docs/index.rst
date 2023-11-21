@@ -11,4 +11,5 @@
 .. toctree::
    :maxdepth: 2
    :hidden:
-   tutorials
+   :caption: General
+    tutorials
