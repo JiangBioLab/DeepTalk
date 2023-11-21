@@ -4,4 +4,4 @@ Tutorials
 ====================
 .. nbgallery::
     tutorial_link
-    tutorial_sq_link
+    tutorial_sp_link
