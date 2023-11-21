@@ -19,7 +19,7 @@ To install DeepTalk, make sure you have [PyTorch](https://pytorch.org/) and [sca
 - To start using DeepTalk, import DeepTalk in your jupyter notebooks or/and scripts
 
 ```
-	import DeepTalk as dt
+	import DeepTalk_ST as dt
 ```
 
 ## How to run DeepTalk for cell type identification
