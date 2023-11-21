@@ -60,6 +60,6 @@ Use subgraph-based graph attention network to construct CCC networks for the lig
     data_path,outdir, Fea_embeddings)
 ```
 
-## Contact
+### Contact
 
 Feel free to submit an issue or contact us at [wenyiyang22@163.com](mailto:wenyiyang22@163.com) for problems about the package.
