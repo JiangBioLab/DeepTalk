@@ -1,4 +1,5 @@
-### How to install DeepTalk
+# Installation
+## How to install DeepTalk
 
 To install DeepTalk, make sure you have [PyTorch](https://pytorch.org/) and [scanpy](https://scanpy.readthedocs.io/en/stable/) installed. If you need more details on the dependences, look at the `environment.yml` file.
 
@@ -21,7 +22,7 @@ To install DeepTalk, make sure you have [PyTorch](https://pytorch.org/) and [sca
 	import DeepTalk as dt
 ```
 
-### How to run DeepTalk for cell type identification
+## How to run DeepTalk for cell type identification
 
 Load your spatial data and your single cell data (which should be in [AnnData](https://anndata.readthedocs.io/en/latest/) format), and pre-process them using dt.pp_adatas`:
 
@@ -45,7 +46,7 @@ The returned AnnData,`ad_map`, is a cell-by-voxel structure where `ad_map.X[i, j
 
 The returned `ad_ge` is a voxel-by-gene AnnData, similar to spatial data `ad_st`, but where gene expression has been projected from the single cells. 
 
-### How to run DeepTalk for cell-cell communication inference
+## How to run DeepTalk for cell-cell communication inference
 
 Generating Feature Files for Deep Learning Using `ad_ge` :
 
