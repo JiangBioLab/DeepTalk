@@ -15,6 +15,6 @@ Deciphering cell-cell communication from spatially resolved transcriptomic data 
    :maxdepth: 2
    :hidden:
    :caption: General
-
+   
    installation
    tutorials
