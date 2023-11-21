@@ -177,7 +177,7 @@ torch-scatter @ https://data.pyg.org/whl/torch-1.8.0%2Bcu111/torch_scatter-2.0.7
 torch-sparse @ https://data.pyg.org/whl/torch-1.8.0%2Bcu111/torch_sparse-0.6.10-cp38-cp38-linux_x86_64.whl#sha256=8ea41e10f0b45f57501432d07c1eee2abc90f45f4f01dd11b2cb9d4928fc4b1f
 torch-spline-conv @ https://data.pyg.org/whl/torch-1.8.0%2Bcu111/torch_spline_conv-1.2.1-cp38-cp38-linux_x86_64.whl#sha256=b1a605edbb4b2616487cb58bc3ccac078e47fcf28360b0a02976b3b688d63944
 torchaudio==0.8.1
-torchvision==0.9.1+cu111
+torchvision==0.9.1
 tornado==6.3.3
 tqdm==4.66.1
 traitlets==5.13.0
