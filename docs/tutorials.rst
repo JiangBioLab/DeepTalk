@@ -1,3 +1,3 @@
 .. toctree::
-   notebooks/Basic_usage
-   notebooks/visium-mouse_brain
+   notebooks/VISP_MER_test
+   notebooks/Adult_mouse_brain
