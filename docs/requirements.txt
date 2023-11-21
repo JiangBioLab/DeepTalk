@@ -1,3 +1,4 @@
+DeepTalk_ST==0.0.12
 sphinx==5.0.0
 sphinx-autodoc-typehints==1.18.1
 sphinx-rtd-theme==1.0.0
