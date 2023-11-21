@@ -1,0 +1,11 @@
+place_of_death richard_feynman los_angeles
+place_of_birth richard_feynman far_rockaway_queens
+gender richard_feynman male
+profession richard_feynman scientist
+profession richard_feynman physicist
+location richard_feynman queens
+location richard_feynman los_alamos
+religion richard_feynman atheism
+institution richard_feynman massachusetts_institute_of_technology
+place_of_birth justin_bieber los_angeles
+gender justin_bieber male

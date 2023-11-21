@@ -1,0 +1,26 @@
+2022-11-22 14:41:03,130 - testrun_22_11_2022_14:41:03 - [INFO] - {'name': 'testrun_22_11_2022_14:41:03', 'dataset': 'FB15k-237', 'model': 'compgcn', 'score_func': 'transe', 'opn': 'sub', 'batch_size': 128, 'gamma': 9.0, 'gpu': '0', 'max_epochs': 500, 'l2': 0.0, 'lr': 0.001, 'lbl_smooth': 0.1, 'num_workers': 10, 'seed': 41504, 'restore': False, 'bias': False, 'num_bases': -1, 'init_dim': 200, 'gcn_dim': 200, 'embed_dim': None, 'gcn_layer': 1, 'dropout': 0.1, 'hid_drop': 0.1, 'hid_drop2': 0.3, 'feat_drop': 0.3, 'k_w': 10, 'k_h': 20, 'num_filt': 200, 'ker_sz': 7, 'log_dir': './log/', 'config_dir': './config/'}
+2022-11-22 14:41:10,284 - testrun_22_11_2022_14:41:03 - [INFO] - [E:0| 0]: Train Loss:0.026324,  Val MRR:0.0	testrun_22_11_2022_14:41:03
+2022-11-22 14:41:32,825 - testrun_22_11_2022_14:41:03 - [INFO] - [E:0| 100]: Train Loss:0.027613,  Val MRR:0.0	testrun_22_11_2022_14:41:03
+2022-11-22 14:41:55,154 - testrun_22_11_2022_14:41:03 - [INFO] - [E:0| 200]: Train Loss:0.024895,  Val MRR:0.0	testrun_22_11_2022_14:41:03
+2022-11-22 14:42:17,831 - testrun_22_11_2022_14:41:03 - [INFO] - [E:0| 300]: Train Loss:0.021067,  Val MRR:0.0	testrun_22_11_2022_14:41:03
+2022-11-22 14:42:40,565 - testrun_22_11_2022_14:41:03 - [INFO] - [E:0| 400]: Train Loss:0.019216,  Val MRR:0.0	testrun_22_11_2022_14:41:03
+2022-11-22 14:43:03,381 - testrun_22_11_2022_14:41:03 - [INFO] - [E:0| 500]: Train Loss:0.017524,  Val MRR:0.0	testrun_22_11_2022_14:41:03
+2022-11-22 14:43:26,154 - testrun_22_11_2022_14:41:03 - [INFO] - [E:0| 600]: Train Loss:0.016024,  Val MRR:0.0	testrun_22_11_2022_14:41:03
+2022-11-22 14:43:48,853 - testrun_22_11_2022_14:41:03 - [INFO] - [E:0| 700]: Train Loss:0.015118,  Val MRR:0.0	testrun_22_11_2022_14:41:03
+2022-11-22 14:44:11,504 - testrun_22_11_2022_14:41:03 - [INFO] - [E:0| 800]: Train Loss:0.014256,  Val MRR:0.0	testrun_22_11_2022_14:41:03
+2022-11-22 14:44:33,662 - testrun_22_11_2022_14:41:03 - [INFO] - [E:0| 900]: Train Loss:0.013685,  Val MRR:0.0	testrun_22_11_2022_14:41:03
+2022-11-22 14:44:56,289 - testrun_22_11_2022_14:41:03 - [INFO] - [E:0| 1000]: Train Loss:0.013203,  Val MRR:0.0	testrun_22_11_2022_14:41:03
+2022-11-22 14:45:18,935 - testrun_22_11_2022_14:41:03 - [INFO] - [E:0| 1100]: Train Loss:0.012901,  Val MRR:0.0	testrun_22_11_2022_14:41:03
+2022-11-22 14:45:34,565 - testrun_22_11_2022_14:41:03 - [INFO] - [Epoch:0]:  Training Loss:0.01266
+
+2022-11-22 14:45:35,091 - testrun_22_11_2022_14:41:03 - [INFO] - [Valid, Tail_Batch Step 0]	testrun_22_11_2022_14:41:03
+2022-11-22 14:45:43,905 - testrun_22_11_2022_14:41:03 - [INFO] - [Valid, Tail_Batch Step 100]	testrun_22_11_2022_14:41:03
+2022-11-22 14:45:47,764 - testrun_22_11_2022_14:41:03 - [INFO] - [Valid, Head_Batch Step 0]	testrun_22_11_2022_14:41:03
+2022-11-22 14:45:56,548 - testrun_22_11_2022_14:41:03 - [INFO] - [Valid, Head_Batch Step 100]	testrun_22_11_2022_14:41:03
+2022-11-22 14:45:59,762 - testrun_22_11_2022_14:41:03 - [INFO] - [Epoch 0 valid]: MRR: Tail : 0.10466, Head : 0.09785, Avg : 0.10125
+2022-11-22 14:45:59,830 - testrun_22_11_2022_14:41:03 - [INFO] - [Epoch 0]: Training Loss: 0.012659, Valid MRR: 0.10125
+
+
+2022-11-22 14:46:00,493 - testrun_22_11_2022_14:41:03 - [INFO] - [E:1| 0]: Train Loss:0.0060326,  Val MRR:0.10125	testrun_22_11_2022_14:41:03
+2022-11-22 14:46:23,042 - testrun_22_11_2022_14:41:03 - [INFO] - [E:1| 100]: Train Loss:0.0076935,  Val MRR:0.10125	testrun_22_11_2022_14:41:03
+2022-11-22 14:46:45,513 - testrun_22_11_2022_14:41:03 - [INFO] - [E:1| 200]: Train Loss:0.0092329,  Val MRR:0.10125	testrun_22_11_2022_14:41:03
