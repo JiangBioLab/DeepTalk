@@ -1,3 +1,4 @@
+DEEPTALK
 .. DeepTalk documentation master file, created by
    sphinx-quickstart on Sat Feb 20 12:08:49 2023.
    You can adapt this file completely to your liking, but it should at least
@@ -14,6 +15,6 @@ Deciphering cell-cell communication from spatially resolved transcriptomic data 
    :maxdepth: 2
    :hidden:
    :caption: General
-    
-    installation
-    tutorials
+
+   installation
+   tutorials
