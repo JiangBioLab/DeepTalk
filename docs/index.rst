@@ -3,10 +3,12 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+DeepTalk
+Deciphering cell-cell communication from spatially resolved transcriptomic data at single-cell resolution with subgraph-based attentional graph neural network
 
-.. mdinclude:: frontpage.md
+.. image:: _static/tangram_overview.png
+    :align: center
 
-.. mdinclude:: ../README.md
 
 .. toctree::
    :maxdepth: 2
