@@ -5,7 +5,7 @@
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
-import DeepTalk_ST
+#import DeepTalk_ST
 
 
 project = 'DeepTalk_ST'
