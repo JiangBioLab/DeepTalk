@@ -10,7 +10,6 @@ Deciphering cell-cell communication from spatially resolved transcriptomic data 
 .. image:: Fig1-3.png
     :align: center
 
-
 .. toctree::
    :maxdepth: 1
    :hidden:
