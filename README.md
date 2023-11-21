@@ -14,7 +14,7 @@ To install DeepTalk, make sure you have [PyTorch](https://pytorch.org/) and [sca
 - set up conda environment for DeepTalk
 
 ```
-	conda env create -f environment.yml
+- conda env create -f environment.yml
 ```
 
 - install DeepTalk_ST from shell:
