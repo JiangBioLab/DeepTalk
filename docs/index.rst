@@ -3,17 +3,12 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-DEEPTALK
-==========================
-Deciphering cell-cell communication from spatially resolved transcriptomic data at single-cell resolution with subgraph-based attentional graph neural network
+.. mdinclude:: frontpage.md
 
-.. image:: Fig1-3.png
-    :align: center
-
+.. mdinclude:: ../README.md
 
 .. toctree::
    :maxdepth: 1
-   :hidden:
    
    installation
    tutorials
