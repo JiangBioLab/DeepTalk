@@ -1,5 +1,4 @@
 # Installation
-## **DeepTalk**
 ## How to install DeepTalk
 
 To install DeepTalk, make sure you have [PyTorch](https://pytorch.org/) and [scanpy](https://scanpy.readthedocs.io/en/stable/) installed. If you need more details on the dependences, look at the `environment.yml` file.
