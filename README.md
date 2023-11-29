@@ -17,7 +17,7 @@ To install DeepTalk, make sure you have [PyTorch](https://pytorch.org/) and [sca
   conda env create -f environment.yml
 ```
 
-- install DeepTalk_ST from shell:
+  install DeepTalk_ST from shell:
 
 ```
     conda activate deeptalk-env
@@ -56,18 +56,30 @@ The returned `ad_ge` is a voxel-by-gene AnnData, similar to spatial data `ad_st`
 
 ### How to run DeepTalk for cell-cell communication inference
 
-Generating Feature Files for Deep Learning Using `ad_ge` :
+Generating Training Files for Deep Learning using `ad_ge` :
 
 ```
-    Fea_embeddings = dt.feature_pca(input_file, lrpairs,cell_pair_all)
+dt.File_Train(data_name, LR_train, outdir =  Test_dir)
 ```
-
+```
+dt.data_for_train(data_dir, data_name, LR_train)
+```
+Generating Predicting Files for Deep Learning using `ad_ge` :
+```
+dt.CCC_LR_pre(data_name,ligand, receptor, cell_pair, outdir)
+```
+```
+dt.data_for_test(data_dir, data_name, LR_test)
+```
 Use subgraph-based graph attention network to construct CCC networks for the ligand-receptor pairs with a spatial distance constraint:
 
 ```
-    cccpre = dt.CCC_Predict(data_name,
-    data_path,outdir, Fea_embeddings)
+dt.Train(data_name,data_path, outdir, pretrained_embeddings, n_epochs = 50, ft_n_epochs=10)
 ```
+```
+dt.run_predict(data_name, data_path, outdir, pretrained_embeddings, model_path)
+```
+
 ## Documentation
 
 See detailed documentation and examples at [https://deeptalk.readthedocs.io/en/latest/index.html](https://deeptalk.readthedocs.io/en/latest/index.html).
