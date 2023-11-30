@@ -21,6 +21,21 @@ To install DeepTalk, make sure you have [PyTorch](https://pytorch.org/) and [sca
 ```
   import DeepTalk as dt
 ```
+because data processing require R and then also install the following:
+
+```
+export R_VERSION=4.1.2
+curl -O https://cdn.rstudio.com/r/ubuntu-2004/pkgs/r-${R_VERSION}_1_amd64.deb
+sudo gdebi r-${R_VERSION}_1_amd64.deb
+sudo ln -s /opt/R/${R_VERSION}/bin/R /usr/local/bin/R
+sudo ln -s /opt/R/${R_VERSION}/bin/Rscript /usr/local/bin/Rscript
+
+install.packages('foreach')
+install.packages('Matrix')
+install.packages('doParallel')
+install.packages('crayon')
+install.packages('reshape2')
+```
 
 ## How to run DeepTalk for cell type identification
 
