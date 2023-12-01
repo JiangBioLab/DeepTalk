@@ -2,8 +2,9 @@
 
 #### **Deciphering cell-cell communication from spatially resolved transcriptomic data at single-cell resolution with subgraph-based attentional graph neural network**
 
-![Fig1-3](https://github.com/JiangBioLab/DeepTalk/assets/72069543/931597d0-4173-4d16-9aab-312299e5bbfa)
 
+
+![Fig1](https://github.com/JiangBioLab/DeepTalk/assets/72069543/eee92dc3-e077-4b92-a583-46f77dea9a7e)
 
 Recent advances in spatial transcriptomics (ST) and single-cell RNA sequencing (scRNA-seq) have revolutionized the study of cell-cell communications (CCCs) in tissue homeostasis, development, and disease. However, deciphering spatially resolved CCC at the single-cell resolution remains a significant challenge, impeding the comprehensive understanding of intercellular dynamics and biochemical processes. Here, we introduce DeepTalk, a deep learning model that harnesses cell-specific gene expression data and spatial distances to predict spatially resolved CCC at the single-cell resolution. DeepTalk utilizes graph attention network (GAT) to efficiently integrate scRNA-seq and ST data, enabling accurate cell type identification for single-cell ST data and deconvolution for non-single-cell ST data. Additionally, leveraging subgraph-based GAT, DeepTalk achieves outstanding accuracy in predicting spatial CCC at the single-cell resolution. Extensive evaluations using diverse publicly available datasets validate the exceptional performance and robustness of DeepTalk in identifying spatial CCC. Furthermore, DeepTalk discovers meaningful CCC patterns between various conditions, enabling exploration of context-specific cell cooperation and signaling.
 
