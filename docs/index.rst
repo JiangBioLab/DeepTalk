@@ -7,7 +7,7 @@ DeepTalk
 ==========================
 Deciphering cell-cell communication from spatially resolved transcriptomic data at single-cell resolution with subgraph-based attentional graph neural network
 
-.. image:: Fig1-1-1.png
+.. image:: Figure1-1-1.png
     :align: center
 
 .. toctree::
