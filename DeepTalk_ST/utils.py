@@ -1,9 +1,11 @@
 from pathlib import Path
 import time
+import random
 from collections import OrderedDict
 from threading import Thread
 import numpy as np
-#import cv2
+from orderedset import OrderedSet
+import json
 import os
 import sys
 import shutil
@@ -19,11 +21,14 @@ import pickle
 import scanpy as sc
 from tqdm import tqdm
 import seaborn as sns
+import multiprocessing
 from sklearn.model_selection import LeaveOneOut
 from sklearn.model_selection import KFold
 from . import map_utils as mu
+#from . import decCCC as decCCC
 import logging
 import warnings
+import concurrent.futures
 from sklearn.metrics import auc
 warnings.filterwarnings("ignore")
 logger_ann = logging.getLogger("anndata")
@@ -1278,6 +1283,27 @@ def transfer_annotations_prob_filter(mapping_matrix, filter, to_transfer):
     return mapping_matrix.transpose() @ tt
 
 
+def gene_select(lrpairs,TF):
+    lrpairs = pd.read_csv(lrpairs)
+    lr_all_human = lrpairs.iloc[0:4715,:].ligand.unique().tolist()+lrpairs.iloc[0:4715,:].receptor.unique().tolist()
+    lr_all_human_new = list(set(lr_all_human))
+
+    lr_all_mouse = lrpairs.iloc[4715:,:].ligand.unique().tolist()+lrpairs.iloc[0:4715,:].receptor.unique().tolist()
+    lr_all_mouse_new = list(set(lr_all_mouse))
+
+    tf = pd.read_csv(TF)
+    tf_human = tf.iloc[0:370593,:].src.unique().tolist()+tf.iloc[0:370593,:].dest.unique().tolist()
+    tf_human_new = list(set(tf_human))
+
+    tf_mouse = tf.iloc[370593:,:].src.unique().tolist()+tf.iloc[0:370593,:].dest.unique().tolist()
+    tf_mouse_new = list(set(tf_mouse))
+
+    gene_all_mouse=list(set(tf_mouse_new + lr_all_mouse_new))
+    gene_all_human=list(set(tf_human_new + lr_all_human_new))
+
+    return gene_all_mouse, gene_all_human
+
+
 def df_to_cell_types(df, cell_types):
     """
     Utility function that "randomly" assigns cell coordinates in a voxel to known numbers of cell types in that voxel.
@@ -1306,200 +1332,15 @@ def df_to_cell_types(df, cell_types):
             cell_types_mapped[i].extend(j["centroids"][start_ind:end_ind].tolist())
     return cell_types_mapped
 
-def feature_pca(input_file = './ad_st_new.csv', lrpairs = './lrpairs.csv', 
-    cell_pair_all = './cell_pair_all.csv'):
-    df = pd.read_csv(input_file,index_col=0)
 
-    lrpairs = pd.read_csv(lrpairs)
-    #select L-R pairs
+def plot_cell_type_ST(ad_st,mapping_colors,cluster):
 
-    lrpairs_ligand = lrpairs["ligand"]
-    lrpairs_receptor = lrpairs["receptor"]
-    #len(lrpairs_ligand)
-    for ii in range(1):
-        #print(lrpairs_ligand[ii])
-
-        Cellpairall = pd.read_csv(cell_pair_all)
-        ligand = Cellpairall["ligand"]
-        receptor = Cellpairall["receptor"]
-        Sender = Cellpairall["cell_sender"]
-        Receiver = Cellpairall["cell_receiver"]
-        CCIlabel = Cellpairall["label"]
-        cell_pair_label = []
-        
-        for i in range(len(Sender)):
-            if ligand[i]==lrpairs_ligand[ii] and receptor[i]==lrpairs_receptor[ii]:
-                if df.loc[lrpairs_ligand[ii],str(Sender[i])]>0.05 and df.loc[lrpairs_receptor[ii],str(Receiver[i])]>0.05:
-                    score = np.sqrt(df.loc[lrpairs_ligand[ii],str(Sender[i])]*df.loc[lrpairs_receptor[ii],str(Receiver[i])])
-                    #print(score)
-                    cell_pair_label.append([Sender[i],Receiver[i],str(score),str(CCIlabel[i])])
-                else:
-                    score = np.sqrt(df.loc[lrpairs_ligand[ii],str(Sender[i])]*df.loc[lrpairs_receptor[ii],str(Receiver[i])])
-                    cell_pair_label.append([Sender[i],Receiver[i],str(score),'0'])
-        cell_pair = []
-        for i in range(len(Sender)):
-            if df.loc[lrpairs_ligand[ii],str(Sender[i])]>0 and df.loc[lrpairs_receptor[ii],str(Receiver[i])]>0:
-                cell_pair.append([Sender[i],Receiver[i]])
-        cell_pair = np.array(cell_pair)
-        new_cell_pair = np.unique(cell_pair, axis=0).tolist()
-        #print(np.sum(np.array(cell_pair_label)[:,-1].astype(np.int32)))
-        #print(len(new_cell_pair))
-        #print(np.sum(np.array(cell_pair_label)[:,-1].astype(np.int32))/len(new_cell_pair))
-        
-        if (len(cell_pair_label))>0:
-            #print(lrpairs_ligand[ii]+'_'+lrpairs_receptor[ii])
-            lrdir = "./data/"+lrpairs_ligand[ii]+'_'+lrpairs_receptor[ii]
-            isExists = os.path.exists(lrdir)
-            if isExists:
-                shutil.rmtree(lrdir)
-                os.makedirs(lrdir)
-            if not isExists:
-                os.makedirs(lrdir)
-            cell_pair_label = np.array(cell_pair_label)
-            cell_pair_index = cell_pair_label[:,0:2].tolist()
-            cell_pair_new = []
-            for i in range(len(new_cell_pair)):
-                if new_cell_pair[i] in cell_pair_index:
-                    cell_pair_new.append(['to'] + new_cell_pair[i] + [cell_pair_label[cell_pair_index.index(new_cell_pair[i]),-2]]
-                                                                      + [cell_pair_label[cell_pair_index.index(new_cell_pair[i]),-1]])
-                else:
-                    cell_pair_new.append(['to'] + new_cell_pair[i] + [0] + [0])
-            CCIlist = np.array(cell_pair_new)
-            CCIlist[:, 1] = np.char.replace(CCIlist[:, 1], 'C', '') 
-            CCIlist[:, 2] = np.char.replace(CCIlist[:, 2], 'C', '')
-            CCIlist[:, 1] = CCIlist[:, 1].astype(np.int)-1
-            CCIlist[:, 2] = CCIlist[:, 2].astype(np.int)-1
-            
-            CCIlist_label = CCIlist[:,-1]
-            CCIlist_source = CCIlist[:,1]
-            CCIlist_target = CCIlist[:,2]
-            #print(CCIlist_source)
-            node_list_all = []
-            node_list = []
-            for i in range(len(CCIlist_label)):
-                node_list_all.append(CCIlist_source[i])
-                node_list_all.append(CCIlist_target[i])    
-                if CCIlist_label[i] == '1':
-                    node_list.append(CCIlist_source[i])
-                    node_list.append(CCIlist_target[i])
-            #print(len(set(node_list_all)))
-            #print(len(set(node_list)))
-            node_no = set(node_list_all) - set(node_list)
-            #print(node_no)
-            no_index = []
-            for i in range(len(CCIlist_label)):
-                if CCIlist_source[i] in node_no or CCIlist_target[i] in node_no:
-                    if CCIlist_label[i] == '0':
-                        no_index.append(i)
-            #print(no_index)
-            CCIlist_score= np.delete(CCIlist, no_index, axis=0)
-            #print(CCIlist_score.shape)
-            
-            np.savetxt(lrdir+'/CCIlistscore.txt', CCIlist_score, fmt='%s', delimiter= ' ')
-            columns = [0, 1, 2, 4]
-            CCIlist_new = CCIlist_score[:,columns]
-            np.savetxt(lrdir+'/CCIlist.txt', CCIlist_new, fmt='%s', delimiter= ' ')
-
-            
-            random.seed(2022)
-            np.random.shuffle(CCIlist_new)
-
-            data_size = len(CCIlist_new)
-
-            data_train = []
-            data_validate = []
-            data_test = []
-            for ii in range(data_size):
-                if ii < round(data_size * 0.7):
-                    data_train.append(CCIlist_new[ii])
-                elif ii in range(round(data_size * 0.7), round(data_size * 0.8)):
-                    data_validate.append(CCIlist_new[ii])
-                else:
-                    data_test.append(CCIlist_new[ii])
-            data_train = np.array(data_train)
-            #print(data_train.shape)
-            np.savetxt(lrdir +'/train.txt', np.array(data_train), fmt='%s', delimiter= ' ')
-            #CCIlist = np.array(CCIlist)
-            postive = []
-            negtive = []
-            for i in range(data_train.shape[0]):
-                if data_train[i,-1]=="1":
-                    postive.append(data_train[i,:])
-                elif data_train[i,-1]=="0":
-                    negtive.append(data_train[i,:])
-
-            #np.savetxt(lrdir +'/train.txt', np.array(postive)[:,0:-1], fmt='%s', delimiter= ' ')
-            #np.savetxt(lrdir +'/negtive.txt', np.array(negtive)[:,0:-1], fmt='%s', delimiter= ' ')
-           
-            np.savetxt(lrdir +'/valid.txt', data_validate, fmt='%s', delimiter= ' ')
-            np.savetxt(lrdir +'/test.txt', data_test, fmt='%s', delimiter= ' ')
-            #print(np.sum(np.array(data_validate)[:,-1].astype(np.int32))/len(data_validate))
-            #print(np.sum(np.array(data_test)[:,-1].astype(np.int32))/len(data_test))
-            ent_set, rel_set = OrderedSet(), OrderedSet()
-
-            for line in open(lrdir +'/CCIlist.txt'):
-                rel, sub, obj,label = map(str.lower, line.strip().split(' '))
-                if label=='1':
-                    ent_set.add(sub)
-                    rel_set.add(rel)
-                    ent_set.add(obj)
-
-            ent2id = {ent: idx for idx, ent in enumerate(ent_set)}
-            rel2id = {rel: idx for idx, rel in enumerate(rel_set)}
-            rel2id.update({rel+'_reverse': idx+len(rel2id) for idx, rel in enumerate(rel_set)})
-
-            with open(lrdir +'/rel2id.txt', 'w') as f:
-                json.dump(rel2id, f)
-            with open(lrdir +'/ent2id.txt', 'w') as f:
-                json.dump(ent2id, f)
-
-            Node = np.loadtxt(lrdir +'/train.txt',skiprows=0,dtype=str,delimiter=' ')
-
-            Node1 = Node[:,1]
-            Node2 = Node[:,2]
-            Node_label = Node[:,-1]
-            #print(np.sum(np.array(Node_label).astype(np.int32)))
-
-            edgelist = []
-            for i in range(len(Node1)):
-                #if Node_label[i] == "1":
-                    edgelist.append([ent2id[Node1[i]],ent2id[Node2[i]]])
-                    #edgelist[i,0] = (ent2id[Node1[i]])
-                    #edgelist[i,1] = (ent2id[Node2[i]])
-            np.savetxt(lrdir +'/edgelist.txt', edgelist, fmt='%d', delimiter=' ')
-            inputfile_path = os.path.join(lrdir,'edgelist.txt')
-            outputfile_path = os.path.join(lrdir,'VM.emd')
-            os.chdir(lrdir)
-            #os.system("/python /mnt/test/a3/DeepTalk/Example/node2vec/src/main.py --dimensions 128 \
-            #          --input ./edgelist.txt --output ./VM.emd")
-            os.chdir('../')
-            os.chdir('../')
-            data_signaling = pd.read_csv('./ad_st_new.csv',index_col=0,low_memory=False).values
-            data_T = data_signaling.T
-            Node0 = np.arange(data_T.shape[0])
-            data_index = []
-            for i in range(len(Node0)):
-                if str(Node0[i,]) in ent2id.keys():          
-                    data_index.append(ent2id[str(Node0[i,])])
-
-            data_emd = data_T[data_index,:]
-            data_emd = data_emd.astype(np.float64)
-
-            from sklearn.decomposition import PCA
-            pca = PCA(n_components=128)
-            newX = pca.fit_transform(data_emd)
-            os.chdir(lrdir)
-            pd.DataFrame(newX, index=data_index).to_csv("./data_pca.emd",sep=' ',header=None)
-            print(newX.shape)
-            os.chdir('../')
-            os.chdir('../')
-
-def plot_cell_type_ST(ad_st,mapping_colors,data_name='./st_meta.csv'):
-
-    df = pd.read_csv(data_name,sep = ',',index_col=0)
-    max_columns = df['celltype'].values
+    #matplotlib.use('agg')
+    fig = plt.figure()
+    #df = pd.read_csv(data_name,sep = ',',index_col=0)
+    max_columns = cluster
     #print(max_columns)
-    ad_st.obs['cell_type'] = max_columns
+    #ad_st.obs['cell_type'] = max_columns
     color_list = []
     for i in range(len(list(max_columns))):
         color_list.append(mapping_colors[list(max_columns)[i]])
@@ -1513,13 +1354,18 @@ def plot_cell_type_ST(ad_st,mapping_colors,data_name='./st_meta.csv'):
     unique_handles = [handles[labels.index(label)] for label in unique_labels]
     plt.legend(unique_handles,unique_labels,loc=(1,0.2),fontsize = 10,ncol =2,frameon=False,handlelength=2, handletextpad=0.5)
     plt.gca().invert_yaxis()
+    plt.show()
+    #plt.gca().invert_yaxis()
+    #plt.close()
 
 
-def plot_CCC_ST(ad_st,mapping_colors,meat_data = './st_meta.csv',data_name='./ad_st_new.csv',ligand = 'Sst',
-    receptor = 'Sstr2',CCC_label = './data/Sst_Sstr2/CCIlist.txt',
-    sourcetype = 'L2.3.IT',targettype = 'L4'):
-
-    df = pd.read_csv(data_name,index_col=0)
+def plot_CCC_ST(ad_st,mapping_colors,cluster,st_data,ligand = 'Sst',
+    receptor = 'Sstr2',CCC_label = './data/Apoe_Grm5/predict_ccc.txt',
+    sourcetype = 'L2.3.IT',targettype = 'L4',top_score = 50):
+    
+    #matplotlib.use('agg')
+    fig = plt.figure()
+    df = st_data
     Sst_value = df.loc[ligand]
     Sstr2_value = df.loc[receptor]
     Nodeall = np.loadtxt(CCC_label,skiprows=0,dtype=str,delimiter=' ')
@@ -1527,8 +1373,8 @@ def plot_CCC_ST(ad_st,mapping_colors,meat_data = './st_meta.csv',data_name='./ad
     nodes = Nodeall[:,1]
     nodet = Nodeall[:,2]
 
-    df_meta = pd.read_csv(meat_data,sep = ',',index_col=0)
-    max_columns = df_meta['celltype'].values
+    #df_meta = pd.read_csv(meat_data,sep = ',',index_col=0)
+    max_columns = cluster
     
     cell_type = list(max_columns)
     #sourcetype = 
@@ -1542,7 +1388,7 @@ def plot_CCC_ST(ad_st,mapping_colors,meat_data = './st_meta.csv',data_name='./ad
         if nodelabel[i] == '1':
             if cell_type[int(nodes[i])] == sourcetype and cell_type[int(nodet[i])] == targettype:
                 score_list.append(np.sqrt(Sst_value[int(nodes[i])]*Sstr2_value[int(nodet[i])]))
-    sorted_list = sorted(enumerate(score_list), key=lambda x: x[1],reverse=True)[0:50]
+    sorted_list = sorted(enumerate(score_list), key=lambda x: x[1],reverse=True)[0:top_score]
     sorted_indices = [index for index, _ in sorted_list]
     sorted_values = [value for _, value in sorted_list]
     Ther = sorted_values[-1]
@@ -1575,25 +1421,26 @@ def plot_CCC_ST(ad_st,mapping_colors,meat_data = './st_meta.csv',data_name='./ad
     plt.legend(unique_handles,unique_labels,loc=(1,0.5),fontsize = 10,ncol = 1,frameon=False,handlelength=2, handletextpad=0.5,title='Cell Type')
 
     #plt.legend(label,loc=(1,0.5),fontsize = 10,ncol = 1,frameon=False,handlelength=2, handletextpad=0.5,title='Cell Type')
-
-
     for i in range(len(x_y_1)):
         plt.annotate("",
                      xy=x_y_2[i], xycoords='data',
                      xytext=x_y_1[i], textcoords='data',
                      arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=0.3", linewidth=1))
-    plt.title('L-R', fontsize=18)
+    plt.title(str(ligand) + '-' + str(receptor), fontsize=18)
     plt.gca().invert_yaxis()
+    plt.show()
+    #plt.close()
 
 
-def plot_CCC_heatmap(meat_data = './st_meta.csv',data_name='./ad_st_new.csv',
-    ligand = 'Sst', receptor = 'Sstr2',
+
+
+def plot_CCC_heatmap(cluster,st_data, ligand = 'Sst', receptor = 'Sstr2',
     CCC_label = './data/Sst_Sstr2/CCIlist.txt'):
-
-    df = pd.read_csv(meat_data,sep = ',',index_col=0)
-    max_columns = df['celltype'].values
+    fig = plt.figure()
+    #df = pd.read_csv(meat_data,sep = ',',index_col=0)
+    max_columns = cluster
     #os.chdir("/mnt/test/a3/DeepSpa/dataset/VISP_MER")
-    df = pd.read_csv(data_name,index_col=0)
+    df = st_data
     Sst_value = df.loc[ligand]
     Sstr2_value = df.loc[receptor]
     Nodeall = np.loadtxt(CCC_label,skiprows=0,dtype=str,delimiter=' ')
@@ -1611,7 +1458,7 @@ def plot_CCC_heatmap(meat_data = './st_meta.csv',data_name='./ad_st_new.csv',
     #print(data.shape)
 
     for i in range(data.shape[0]):
-        print("cells:",unique_cell_type[i])
+        #print("cells:",unique_cell_type[i])
         for j in range(data.shape[0]):
             #print("cellt:",unique_cell_type[j])
             sourcetype = unique_cell_type[i]
@@ -1642,7 +1489,6 @@ def plot_CCC_heatmap(meat_data = './st_meta.csv',data_name='./ad_st_new.csv',
     # 创建样本名称列表
     sample_names = unique_cell_type
 
-    # 绘制热图
     plt.imshow(result*100,cmap = 'Spectral_r')
 
     num_rows, num_cols = result.shape
@@ -1650,133 +1496,1283 @@ def plot_CCC_heatmap(meat_data = './st_meta.csv',data_name='./ad_st_new.csv',
         for j in range(num_cols):
             plt.gca().add_patch(plt.Rectangle((j - 0.5, i - 0.5), 1, 1, edgecolor='white', linewidth=0.5, fill=False))
 
-
-
-    # 设置x轴和y轴刻度
     plt.xticks(np.arange(len(sample_names)), sample_names, rotation=90)
     plt.yticks(np.arange(len(sample_names)), sample_names)
 
-    # 添加颜色栏
     plt.colorbar()
     #plt.savefig('./fig/Heatmap_Sst_Sstr2.pdf',bbox_inches='tight',dpi=300)
     # 显示图形
     plt.show()
 
-def plot_LR_heatmap(cell_pair_all = './cell_pair_all.csv',
-    meat_data = './st_meta.csv',data_name='./ad_st_new.csv',
-    sourcetype = 'Pvalb'):
+
+
+
+def create_cell_pair_new(cp, cell_pair_index, cell_pair_label):
+    if cp in cell_pair_index:
+        return ['to'] + cp + cell_pair_label[cell_pair_index.index(cp), -2:].tolist()
+    else:
+        return ['to'] + cp + [0, 0]
+
+def Cell_Label_Define(st_data, ligand, receptor,cell_pair, outdir):
+
+    import os
+    #df = pd.read_csv(data_name, index_col=0)
+    #print(df)
+    lrpairs_ligand = ligand
+    lrpairs_receptor = receptor
     
-    rcParams['font.family'] = 'Arial'
-    Cellpairall = pd.read_csv(cell_pair_all)
-    tool_res_dic = {}
-    df_new = Cellpairall[["celltype_sender","celltype_receiver","ligand","receptor","label"]]
-    df_new = df_new.drop_duplicates()
-    #print(df_new)
-    ligand = df_new["ligand"].values.tolist()
-    receptor = df_new["receptor"].values.tolist()
-    Sender = df_new["celltype_sender"].values.tolist()
-    Receiver = df_new["celltype_receiver"].values.tolist()
-    CCIlabel = df_new["label"].values.tolist()
+    Cellpairall = cell_pair
+    ligand = Cellpairall["ligand"].values
+    receptor = Cellpairall["receptor"].values
+    Sender = Cellpairall["cell_sender"].values
+    Receiver = Cellpairall["cell_receiver"].values
+    CCIlabel = Cellpairall["label"].values
+    cell_pair_label = []
+    for i in range(len(Sender)):
+        ligand_val = st_data.loc[lrpairs_ligand, str(Sender[i])]
+        receptor_val = st_data.loc[lrpairs_receptor, str(Receiver[i])]
+        if ligand_val > 0.05 and receptor_val > 0.05:
+            score = np.sqrt(ligand_val * receptor_val)
+            cell_pair_label.append([Sender[i], Receiver[i], str(score), str(CCIlabel[i])])
+        else:
+            score = np.sqrt(ligand_val * receptor_val)
+            cell_pair_label.append([Sender[i], Receiver[i], str(score), '0'])
+    cell_pair = []
+    for i in range(len(Sender)):
+        sender_val = st_data.loc[lrpairs_ligand, str(Sender[i])]
+        receiver_val = st_data.loc[lrpairs_receptor, str(Receiver[i])]
+        if sender_val > 0 and receiver_val > 0:
+            cell_pair.append([Sender[i], Receiver[i]])
+    
+    cell_pair = np.array(cell_pair)
+    new_cell_pair = np.unique(cell_pair, axis=0).tolist()
+    
+    if len(cell_pair_label) <= 0:
+        print('no cell pair for this L-R')
+    else:
+        lrdir = outdir + "data/" + lrpairs_ligand + '_' + lrpairs_receptor
+        isExists = os.path.exists(lrdir)
+        if isExists:
+            pass
+        else:
+            os.makedirs(lrdir)
+    
+    #print('Staring')
+    cell_pair_label = np.array(cell_pair_label)
+    cell_pair_index = cell_pair_label[:, 0:2].tolist()
+    n_cores = multiprocessing.cpu_count()
+    n_cores = int(n_cores / 2)
+    with multiprocessing.Pool(processes=n_cores) as pool:
+        cell_pair_new = pool.starmap(create_cell_pair_new, zip(new_cell_pair, [cell_pair_index]*len(new_cell_pair), [cell_pair_label]*len(new_cell_pair)))
+
+    pool.close()
+    pool.join()
+
+    CCIlist = np.array(cell_pair_new)
+    CCIlist[:, 1] = np.char.replace(CCIlist[:, 1], 'C', '')
+    CCIlist[:, 2] = np.char.replace(CCIlist[:, 2], 'C', '')
+    CCIlist[:, 1] = CCIlist[:, 1].astype(np.int) - 1
+    CCIlist[:, 2] = CCIlist[:, 2].astype(np.int) - 1
+    CCIlist_label = CCIlist[:, -1]
+    CCIlist_source = CCIlist[:, 1]
+    CCIlist_target = CCIlist[:, 2]
+
+    node_list_all = []
+    node_list = []
+    for i in range(len(CCIlist_label)):
+        node_list_all.append(CCIlist_source[i])
+        node_list_all.append(CCIlist_target[i])
+        if CCIlist_label[i] == '1':
+            node_list.append(CCIlist_source[i])
+            node_list.append(CCIlist_target[i])
+
+    node_no = set(node_list_all) - set(node_list)
+    no_index = []
+
+    for i in range(len(CCIlist_label)):
+        if CCIlist_source[i] in node_no or CCIlist_target[i] in node_no:
+            if CCIlist_label[i] == '0':
+                no_index.append(i)
+
+    CCIlist_score = np.delete(CCIlist, no_index, axis=0)
+    #columns = [0, 1, 2, 3]
+    #CCIlist_new_score = CCIlist_score[:, columns]
+
+    #np.savetxt(lrdir + '/CCIlist_score.txt', CCIlist_new_score, fmt='%s', delimiter=' ')
+    columns = [0, 1, 2, 4]
+    CCIlist_new = CCIlist_score[:, columns]
+    np.savetxt(lrdir + '/CCIlist.txt', CCIlist_new, fmt='%s', delimiter=' ')
+    #print('Done')
+
+def CCC_LR_pre(st_data, ligand, receptor, cell_pair, outdir):
+    import os
+    #df = pd.read_csv(data_name, index_col=0)
+    
+    n_cores = multiprocessing.cpu_count()
+    n_cores = int(n_cores / 2)
+
+    #if if_doParallel:
+    #    pool = multiprocessing.Pool(n_cores)
+
+    lrpairs_ligand = ligand
+    lrpairs_receptor = receptor
+    
+    Cellpairall = cell_pair
+    ligand = Cellpairall["ligand"].values
+    receptor = Cellpairall["receptor"].values
+    Sender = Cellpairall["cell_sender"].values
+    Receiver = Cellpairall["cell_receiver"].values
+    CCIlabel = Cellpairall["label"].values
+    cell_pair_label = []
+    for i in range(len(Sender)):
+        ligand_val = st_data.loc[lrpairs_ligand, str(Sender[i])]
+        receptor_val = st_data.loc[lrpairs_receptor, str(Receiver[i])]
+        if ligand_val > 0.05 and receptor_val > 0.05:
+            score = np.sqrt(ligand_val * receptor_val)
+            cell_pair_label.append([Sender[i], Receiver[i], str(score), str(CCIlabel[i])])
+        else:
+            score = np.sqrt(ligand_val * receptor_val)
+            cell_pair_label.append([Sender[i], Receiver[i], str(score), '0'])
+    cell_pair = []
+    for i in range(len(Sender)):
+        sender_val = st_data.loc[lrpairs_ligand, str(Sender[i])]
+        receiver_val = st_data.loc[lrpairs_receptor, str(Receiver[i])]
+        if sender_val > 0 and receiver_val > 0:
+            cell_pair.append([Sender[i], Receiver[i]])
+    
+    cell_pair = np.array(cell_pair)
+    new_cell_pair = np.unique(cell_pair, axis=0).tolist()
+    
+    if len(cell_pair_label) <= 0:
+        print('no cell pair for this L-R')
+    else:
+        lrdir = outdir + "data/" + lrpairs_ligand + '_' + lrpairs_receptor
+        isExists = os.path.exists(lrdir)
+        if isExists:
+            pass
+        else:
+            os.makedirs(lrdir)
+    
+    #print('staring')
+    cell_pair_label = np.array(cell_pair_label)
+    cell_pair_index = cell_pair_label[:, 0:2].tolist()
+    
+    with multiprocessing.Pool(processes=n_cores) as pool:
+        cell_pair_new = pool.starmap(create_cell_pair_new, zip(new_cell_pair, [cell_pair_index]*len(new_cell_pair), [cell_pair_label]*len(new_cell_pair)))
+
+    pool.close()
+    pool.join()
+
+    CCIlist = np.array(cell_pair_new)
+    CCIlist[:, 1] = np.char.replace(CCIlist[:, 1], 'C', '')
+    CCIlist[:, 2] = np.char.replace(CCIlist[:, 2], 'C', '')
+    CCIlist[:, 1] = CCIlist[:, 1].astype(np.int) - 1
+    CCIlist[:, 2] = CCIlist[:, 2].astype(np.int) - 1
+    CCIlist_label = CCIlist[:, -1]
+    CCIlist_source = CCIlist[:, 1]
+    CCIlist_target = CCIlist[:, 2]
+
+    node_list_all = []
+    node_list = []
+    for i in range(len(CCIlist_label)):
+        node_list_all.append(CCIlist_source[i])
+        node_list_all.append(CCIlist_target[i])
+        if CCIlist_label[i] == '1':
+            node_list.append(CCIlist_source[i])
+            node_list.append(CCIlist_target[i])
+
+    node_no = set(node_list_all) - set(node_list)
+    no_index = []
+
+    for i in range(len(CCIlist_label)):
+        if CCIlist_source[i] in node_no or CCIlist_target[i] in node_no:
+            if CCIlist_label[i] == '0':
+                no_index.append(i)
+
+    CCIlist_score = np.delete(CCIlist, no_index, axis=0)
+    #columns = [0, 1, 2, 3]
+    #CCIlist_new_score = CCIlist_score[:, columns]
+    #np.savetxt(lrdir + '/test_score.txt', CCIlist_new_score, fmt='%s', delimiter=' ')
+    columns = [0, 1, 2, 4]
+    CCIlist_new = CCIlist_score[:, columns]
+    np.savetxt(lrdir + '/test.txt', CCIlist_new, fmt='%s', delimiter=' ')
+    #import os
+    #os.remove(outdir + '/cell_pair_all.csv')
+
+def File_Train(st_data, pathways, lrpairs, meta_data, species, 
+    LR_train = 'Sst_Sstr2',outdir =  './Test/single-cell/'):
+    '''
+    import subprocess
+    r_script = outdir + "/single_cell_process.R"
+    arg1 = outdir
+    arg2 = outdir + '/lrpairs_new.csv'
+    cmd = ["Rscript", r_script, arg1, arg2]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    '''
+    import time
+    start = time.time()
+    cell_pair_all,lrpairs = DecCCC(st_data, pathways, lrpairs, meta_data, species, outdir)
+    cell_pair_all = cell_pair_all.reindex(columns=['cell_sender', 'cell_receiver', 'celltype_sender', 'celltype_receiver', 'ligand', 'receptor', 'label'])
+    cell_pair_all['label'] = cell_pair_all['label'].fillna(0)
+    cell_pair_all['label'] = cell_pair_all['label'].replace([np.inf, -np.inf], np.nan).fillna(999).astype(int)
+
+    #cell_pair_all.to_csv(outdir + '/cell_pair_all.csv', index=False)
+    #lrpairs.to_csv(outdir + '/lrpairs_pre.csv', index=False)
+    Cell_Label_Define(st_data = st_data, ligand = LR_train.split('_')[0], receptor = LR_train.split('_')[1],
+                      cell_pair = cell_pair_all, outdir =  outdir)
+    end = time.time()
+    execution_time = end - start
+    print(f"Execution time: {execution_time} seconds")
+    #CCC_LR_pre(data_name = data_name,ligand = LR_predict.split('_')[0], receptor = LR_predict.split('_')[1],
+    #           cell_pair = outdir + '/cell_pair_all.csv', outdir = outdir)
+    #import os
+    #os.remove(outdir + '/cell_pair_all.csv')
+
+def File_Pre(st_data, pathways, lrpairs, meta_data, species, 
+    LR_Pre = 'Sst_Sstr2',outdir =  './Test/spot/'):
+    '''
+    import subprocess
+    r_script = outdir + "/spot_process.R"
+    arg1 = outdir
+    arg2 = outdir + '/lrpairs_new.csv'
+    cmd = ["Rscript", r_script, arg1, arg2]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    '''
+    import time
+    start = time.time()
+    cell_pair_all,lrpairs = DecCCC_pre(st_data, pathways, lrpairs, meta_data, species, outdir)
+    cell_pair_all = cell_pair_all.reindex(columns=['cell_sender', 'cell_receiver', 'celltype_sender', 'celltype_receiver', 'ligand', 'receptor', 'label'])
+    cell_pair_all['label'] = cell_pair_all['label'].fillna(0)
+    cell_pair_all['label'] = cell_pair_all['label'].replace([np.inf, -np.inf], np.nan).fillna(999).astype(int)
+
+    #cell_pair_all.to_csv(outdir + '/cell_pair_all.csv', index=False)
+    #lrpairs.to_csv(outdir + '/lrpairs_pre.csv', index=False)
+    '''
+    Cell_Label_Define(data_name = data_name, ligand = LR_train.split('_')[0], receptor = LR_train.split('_')[1],
+                      cell_pair =  outdir + '/cell_pair_all.csv', outdir =  outdir)
+    '''
+    CCC_LR_pre(st_data = st_data,ligand = LR_Pre.split('_')[0], receptor = LR_Pre.split('_')[1],
+               cell_pair=cell_pair_all, outdir = outdir)
+    end = time.time()
+    execution_time = end - start
+    #print(f"Execution time: {execution_time} seconds")
+    #import os
+    #os.remove(outdir + '/cell_pair_all.csv')
 
 
-    for i in range(len(CCIlabel)):
+def New_ST_data_pre(ad_sc, ad_ge_new, st_obs, sc_obs, outdir =  './Test/spot/'):
+    
+    import copy
+    '''
+    import subprocess
+    r_script = outdir + "/NewSTdata.R"
+    arg1 = outdir
+    cmd = ["Rscript", r_script, arg1]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    '''
+    newdata = New_NSST_data(ad_sc, ad_ge_new, st_obs, sc_obs,use_n_cores = None)
 
-        if str(CCIlabel[i]) == '1':
-            CC = Sender[i] + '|' + Receiver[i]
-            LR = []
-            for j in range(len(CCIlabel)):
-                if Sender[j]==Sender[i] and Receiver[j]== Receiver[i]:
-                    LR.append(ligand[j] + ' - ' + receptor[j])
-            LR = list(set(LR))
-            tool_res_dic.update({
-                CC: LR
-            })
+    gene_all_mouse, gene_all_human = gene_select(lrpairs = outdir + '/lrpairs_new.csv',TF = outdir + '/df_pathways.csv')
+    #newdata = pd.read_csv(outdir + '/newdata.csv',index_col=0)
+    newadata = sc.AnnData(newdata.T)
+    
+    newadata1 = copy.deepcopy(newadata)
+    sc.pp.filter_cells(newadata1, min_genes=200)
+    sc.pp.filter_genes(newadata1, min_cells=3)
+    sc.pp.filter_genes_dispersion(newadata1,flavor='cell_ranger', log=False)
+    newadata1 = newadata1[:, newadata1.X.mean(axis=0) >= 0.5]
 
+    index1 = [word.capitalize() for word in newadata1.var.index]
+    c_list = [f'C{i}' for i in range(1, newadata1.X.shape[0]+1)]
+    stnewdata = pd.DataFrame(newadata1.X.T,index=index1,columns=c_list)
+    stnewdata = stnewdata[stnewdata.index.isin(gene_all_mouse)]
+    #df.to_csv(outdir + './ad_st_new.csv',float_format='%.2f')
+    return stnewdata
 
-    df = pd.read_csv(meat_data,sep = ',',index_col=0)
-    max_columns = df['celltype'].values
-    cell_type = list(max_columns)
-    dic = {}
-    unique_cell_type = list(set(cell_type))
-    #unique_cell_type=['Vip','Lamp5','Astro','Sncg','Macrophage','NP','Sst','L4','L5_IT', 'L6_IT', 'L6_CT']
-    #unique_cell_type=['L4', 'L5_PT','L5_IT', 'L6_IT','L6b', 'L6_CT']
+def data_for_train(st_data, data_dir = './Test/single-cell/data', LR_train = 'Sst_Sstr2'):
 
-    for j in range(len(unique_cell_type)):
-        sourcetype = sourcetype
-        targettype = unique_cell_type[j]
+    random.seed(2023)
 
-        cellpair = sourcetype + '|' + str(unique_cell_type[j])
-        print(cellpair)
-        list1 = []
-        for i in range(len(tool_res_dic[cellpair])):
-            df = pd.read_csv(data_name,index_col=0)
-            L = tool_res_dic[cellpair][i].split(' - ')[0]
-            R = tool_res_dic[cellpair][i].split(' - ')[1]
-            Sst_value = df.loc[L]
-            Sstr2_value = df.loc[R]
-            LR = str(L) + '_' + str(R)
-            print(LR)
-            CCI_file = './data/'+ LR +'/CCIlist.txt'
-            if os.path.exists(CCI_file):
-                Nodeall = np.loadtxt('./data/'+ LR +'/CCIlist.txt',skiprows=0,dtype=str,delimiter=' ')
-                nodelabel = Nodeall[:,-1]
-                nodes = Nodeall[:,1]
-                nodet = Nodeall[:,2]
-                score = []
-                for m in range(len(nodelabel)):
-                    if nodelabel[m] == '1':
-                        #print(cell_type[int(nodes[m])])
-                        #print(cell_type[int(nodet[m])])
-                        if cell_type[int(nodes[m])] == sourcetype and cell_type[int(nodet[m])] == targettype:
-                            
-                            score1 = np.sqrt(Sst_value[int(nodes[m])] * Sstr2_value[int(nodet[m])])
-                            
-                            score.append(score1)
-                        else:
-                            score.append(0)
-                    else:
-                        score.append(0)
-                #print(score)
-                score_mean =  np.mean(np.array(score).astype(np.float64))
-            print(score_mean)
-            list1.append(LR + ':' +str(score_mean))
-        dic.update({
-                    cellpair: list1
-                })
-    max_values = sorted([float(v.split(':')[1]) for sublist in dic.values() for v in sublist], reverse=True)[:50]
+    CCIlist_train = data_dir + LR_train + '/CCIlist.txt'
 
-    # 生成新的字典，只保留最大5个数的值
-    new_data = {k: [v for v in sublist if float(v.split(':')[1]) in max_values] for k, sublist in dic.items()}
+    CCIlist_new = np.loadtxt(CCIlist_train,skiprows=0,dtype=str,delimiter=' ')
 
+    #np.random.shuffle(CCIlist_train)
+    #np.random.shuffle(CCIlist_pre)
+    np.random.shuffle(CCIlist_new)
 
-    df = pd.DataFrame([(key, value) for key, values in new_data.items() for value in values], columns=['key', 'value'])
-    df[['column', 'data']] = df['value'].str.split(':', 1, expand=True)
-    df = df.pivot(index='key', columns='column', values='data')
-    df.columns.name = None
+    data_size = len(CCIlist_new)
 
-    df = df.fillna(0)
+    data_train = []
+    data_validate = []
+    data_test = []
+    for ii in range(data_size):
+        if ii < round(data_size * 0.7):
+            data_train.append(CCIlist_new[ii])
+        elif ii in range(round(data_size * 0.7), round(data_size * 0.8)):
+            data_validate.append(CCIlist_new[ii])
+        else:
+            data_test.append(CCIlist_new[ii])
+    data_train = np.array(data_train)
+    #print(data_train.shape)
+    np.savetxt(data_dir + LR_train +'/train.txt', np.array(data_train), fmt='%s', delimiter= ' ')
+    #CCIlist = np.array(CCIlist)
+    postive = []
+    negtive = []
+    for i in range(data_train.shape[0]):
+        if data_train[i,-1]=="1":
+            postive.append(data_train[i,:])
+        elif data_train[i,-1]=="0":
+            negtive.append(data_train[i,:])
+
+    np.savetxt(data_dir + LR_train + '/valid.txt', data_validate, fmt='%s', delimiter= ' ')
+    np.savetxt(data_dir + LR_train +'/test.txt', data_test, fmt='%s', delimiter= ' ')
+    #print(np.sum(np.array(data_validate)[:,-1].astype(np.int32))/len(data_validate))
+    #print(np.sum(np.array(data_test)[:,-1].astype(np.int32))/len(data_test))
 
 
-    data =  np.array(df.values).astype(float)
+    ent_set, rel_set = OrderedSet(), OrderedSet()
 
-    # 绘制热图
-    plt.imshow(data,cmap = 'Spectral_r')
+    for line in open(CCIlist_train):
+        arr = line.strip().split(" ")
+        if len(arr)>3:
+            rel, sub, obj,label = map(str.lower, line.strip().split(' '))
+            #if label=='1':
+            ent_set.add(sub)
+            rel_set.add(rel)
+            ent_set.add(obj)
+        else:
+            rel, sub, obj = map(str.lower, line.strip().split(' '))
+            #if label=='1':
+            ent_set.add(sub)
+            rel_set.add(rel)
+            ent_set.add(obj)
 
-    num_rows, num_cols = data.shape
-    for i in range(num_rows):
-        for j in range(num_cols):
-            plt.gca().add_patch(plt.Rectangle((j - 0.5, i - 0.5), 1, 1, edgecolor='white', linewidth=0.5, fill=False))
+    ent2id = {ent: idx for idx, ent in enumerate(ent_set)}
+    rel2id = {rel: idx for idx, rel in enumerate(rel_set)}
+    rel2id.update({rel+'_reverse': idx+len(rel2id) for idx, rel in enumerate(rel_set)})
+
+    with open(data_dir + LR_train +'/rel2id.txt', 'w') as f:
+        json.dump(rel2id, f)
+    with open(data_dir + LR_train +'/ent2id.txt', 'w') as f:
+        json.dump(ent2id, f)
+
+    Node = np.loadtxt(CCIlist_train,skiprows=0,dtype=str,delimiter=' ')
+
+    Node1 = Node[:,1]
+    Node2 = Node[:,2]
+    Node_label = Node[:,-1]
+    #print(np.sum(np.array(Node_label).astype(np.int32)))
+
+    edgelist = []
+    for i in range(len(Node1)):
+        #if Node_label[i] == "1":
+            edgelist.append([ent2id[Node1[i]],ent2id[Node2[i]]])
+            #edgelist[i,0] = (ent2id[Node1[i]])
+            #edgelist[i,1] = (ent2id[Node2[i]])
+    np.savetxt(data_dir + LR_train +'/edgelist.txt', edgelist, fmt='%d', delimiter=' ')
+
+    #np.savetxt(data_dir + LR_pre  +'/Pre.txt', CCIlist_pre, fmt='%s', delimiter= ' ')
+
+    #data_signaling = pd.read_csv(data_name,index_col=0,low_memory=False).values
+    data_signaling = st_data.values
+    data_T = data_signaling.T
+    Node0 = np.arange(data_T.shape[0])
+    data_index = []
+    for i in range(len(Node0)):
+        if str(Node0[i,]) in ent2id.keys():
+            data_index.append(ent2id[str(Node0[i,])])
+
+    data_emd = data_T[data_index,:]
+    data_emd = data_emd.astype(np.float64)
+
+    from sklearn.decomposition import PCA
+    pca = PCA(n_components=128)
+    newX = pca.fit_transform(data_emd)
+    pd.DataFrame(newX, index=data_index).to_csv(data_dir + LR_train + "/data_pca.emd",sep=' ',header=None)
+
+def data_for_pre(st_data, data_dir = './Test/single-cell/', LR_pre = 'Sst_Sstr2'):
+
+    random.seed(2023)
+
+    CCIlist_train = data_dir + LR_pre + '/test.txt'
+
+
+    ent_set, rel_set = OrderedSet(), OrderedSet()
+
+    for line in open(CCIlist_train):
+        arr = line.strip().split(" ")
+        if len(arr)>3:
+            rel, sub, obj,label = map(str.lower, line.strip().split(' '))
+            #if label=='1':
+            ent_set.add(sub)
+            rel_set.add(rel)
+            ent_set.add(obj)
+        else:
+            rel, sub, obj = map(str.lower, line.strip().split(' '))
+            #if label=='1':
+            ent_set.add(sub)
+            rel_set.add(rel)
+            ent_set.add(obj)
+
+    ent2id = {ent: idx for idx, ent in enumerate(ent_set)}
+    rel2id = {rel: idx for idx, rel in enumerate(rel_set)}
+    rel2id.update({rel+'_reverse': idx+len(rel2id) for idx, rel in enumerate(rel_set)})
+
+    with open(data_dir + LR_pre +'/rel2id.txt', 'w') as f:
+        json.dump(rel2id, f)
+    with open(data_dir + LR_pre +'/ent2id.txt', 'w') as f:
+        json.dump(ent2id, f)
+
+    Node = np.loadtxt(CCIlist_train,skiprows=0,dtype=str,delimiter=' ')
+
+    Node1 = Node[:,1]
+    Node2 = Node[:,2]
+    Node_label = Node[:,-1]
+    #print(np.sum(np.array(Node_label).astype(np.int32)))
+
+    edgelist = []
+    for i in range(len(Node1)):
+        #if Node_label[i] == "1":
+            edgelist.append([ent2id[Node1[i]],ent2id[Node2[i]]])
+            #edgelist[i,0] = (ent2id[Node1[i]])
+            #edgelist[i,1] = (ent2id[Node2[i]])
+    np.savetxt(data_dir + LR_pre +'/edgelist.txt', edgelist, fmt='%d', delimiter=' ')
+
+    #np.savetxt(data_dir + LR_pre  +'/Pre.txt', CCIlist_pre, fmt='%s', delimiter= ' ')
+
+    #data_signaling = pd.read_csv(data_name,index_col=0,low_memory=False).values
+    data_signaling = st_data.values
+    data_T = data_signaling.T
+    Node0 = np.arange(data_T.shape[0])
+    data_index = []
+    for i in range(len(Node0)):
+        if str(Node0[i,]) in ent2id.keys():
+            data_index.append(ent2id[str(Node0[i,])])
+
+    data_emd = data_T[data_index,:]
+    data_emd = data_emd.astype(np.float64)
+
+    from sklearn.decomposition import PCA
+    pca = PCA(n_components=128)
+    newX = pca.fit_transform(data_emd)
+    pd.DataFrame(newX, index=data_index).to_csv(data_dir + LR_pre + "/data_pca_pre.emd",sep=' ',header=None)
+
+import pandas as pd
+import numpy as np
+import random
+from scipy.spatial import distance
+from scipy.sparse import csr_matrix
+import multiprocessing
+from functools import partial
+from multiprocessing import Pool, cpu_count
+from joblib import Parallel, delayed
+from itertools import repeat
+
+
+class DeepTalk:
+    def __init__(self):
+        self.data = []
+        self.meta = []
+        self.para = []
+        self.coef = np.array([])
+        self.cellpair = []
+        self.dist = np.array([])
+        self.lrpair = pd.DataFrame()
+        self.tf = pd.DataFrame()
+        self.lr_path = []
+
+def createDeepTalk(st_data, st_meta, species, if_st_is_sc, spot_max_cell, celltype=None):
+    
+    if if_st_is_sc:
+        expected_cols = ['cell', 'x', 'y']
+        if not all(expected_cols == st_meta.columns):
+            raise ValueError("Please provide a correct st_meta data.frame!")
+        if not all(st_data.columns == st_meta['cell']):
+            raise ValueError("colnames(st_data) is not consistent with st_meta$cell!")
+        st_type = "single-cell"
+        spot_max_cell = 1
+    else:
+        expected_cols = ['spot', 'x', 'y']
+        if not all(expected_cols == st_meta.columns):
+            raise ValueError("Please provide a correct st_meta data.frame!")
+        if not all(st_data.columns == st_meta['spot']):
+            raise ValueError("colnames(st_data) is not consistent with st_meta$spot!")
+        st_type = "spot"
+
+    if spot_max_cell is None:
+        raise ValueError("Please provide the spot_max_cell!")
+
+    st_data = st_data.loc[st_data.sum(axis=1) > 0, :]
+    if st_data.shape[0] == 0:
+        raise ValueError("No expressed genes in st_data!")
+
+    def percent_cell(x):
+        return len(x[x > 0])
+    st_meta['nFeatures'] = pd.to_numeric(st_data.apply(percent_cell, axis=0)).values
+    st_meta['label'] = "-"
+    st_meta['cell_num'] = spot_max_cell
+    st_meta['celltype'] = "unsure"
+    
+    if celltype is not None:
+        st_meta['celltype'] = celltype.str.replace(' ', '_').str.replace('-', '_')
+        if_skip_dec_celltype = True
+    
+    st_meta.iloc[:, 0] = st_meta.iloc[:, 0].str.replace(' ', '_').str.replace('-', '_') 
+    st_data.columns = st_meta.iloc[:, 0]
+    
+    obj = {
+        "data": {
+            "rawdata": st_data
+        },
+        "meta": {
+            "rawmeta": st_meta
+        },
+        "para": {
+            "species": species,
+            "st_type": st_type,
+            "spot_max_cell": spot_max_cell,
+            "if_skip_dec_celltype": if_skip_dec_celltype
+        }
+    }
+
+    return obj
+
+def get_st_meta(object):
+    st_type = object["para"]["st_type"]
+    if_skip_dec_celltype = object["para"]["if_skip_dec_celltype"]
+    
+    if st_type == "single-cell":
+        st_meta = object["meta"]["rawmeta"]
+        st_meta = st_meta[st_meta["celltype"] != "unsure"]
+        st_meta = st_meta[st_meta["label"] != "less nFeatures"]
+        if st_meta.shape[0] == 0:
+            raise ValueError("No cell types found in rawmeta by excluding the unsure and less nFeatures cells!")
+    else:
+        if if_skip_dec_celltype:
+            st_meta = object["meta"]["rawmeta"]
+            st_meta.columns = ["cell"] + st_meta.columns[1:].tolist()
+        else:
+            st_meta = object["meta"]["newmeta"]
+    
+    return st_meta
+
+def get_st_data(obj):
+    st_type = obj["para"]["st_type"]
+    if_skip_dec_celltype = obj["para"]["if_skip_dec_celltype"]
+    
+    if st_type == "single-cell":
+        st_data = obj["data"]
+        if if_skip_dec_celltype:
+            st_data = st_data["rawdata"]
+        else:
+            st_data = st_data["rawndata"]
+            
+        st_meta = obj["meta"]["rawmeta"]
+        st_meta = st_meta[st_meta["celltype"] != "unsure"]
+        st_meta = st_meta[st_meta["label"] != "less nFeatures"]
+        
+        st_data = st_data[st_meta["cell"]]
+        
+        gene_expressed_ratio = np.sum(st_data, axis=1)
+        st_data = st_data[gene_expressed_ratio > 0]
+        
+        if st_data.shape[0] == 0:
+            raise ValueError("No cell types found in rawmeta by excluding the unsure and less nFeatures cells!")
+    else:
+        if if_skip_dec_celltype:
+            st_data = obj["data"]["rawdata"]
+        else:
+            st_data = obj["data"]["newdata"]
+        
+        gene_expressed_ratio = np.sum(st_data, axis=1)
+        st_data = st_data[gene_expressed_ratio > 0]
+        if st_data.shape[0] == 0:
+            raise ValueError("No expressed genes in newdata!")
+    
+    return st_data
+
+def st_dist(st_meta):
+    st_xy = np.column_stack((st_meta['x'], st_meta['y']))
+    st_dist = pd.DataFrame(distance.squareform(distance.pdist(st_xy)),
+                           index=st_meta.iloc[:, 0], columns=st_meta.iloc[:, 0])
+    return st_dist
+
+def find_receptor_tf(args):
+    i, receptor_name, max_hop, st_data, ggi_tf = args
+    ggi_res = None
+    lr_receptor = receptor_name[i]
+    ggi_tf1 = ggi_tf[ggi_tf['src'] == lr_receptor]
+    ggi_tf1 = ggi_tf1[ggi_tf1['dest'].isin(st_data.index)].drop_duplicates(subset=['dest'])
+    if not ggi_tf1.empty:
+        n = 0
+        ggi_tf1['hop'] = n + 1
+        while n <= max_hop:
+            ggi_res = pd.concat([ggi_res, ggi_tf1])
+            ggi_tf1 = ggi_tf[ggi_tf['src'].isin(ggi_tf1['dest'])]
+            ggi_tf1 = ggi_tf1[ggi_tf1['dest'].isin(st_data.index)].drop_duplicates(subset=['dest'])
+            if ggi_tf1.empty:
+                break
+            ggi_tf1['hop'] = n + 2
+            n += 1
+        ggi_res = ggi_res.drop_duplicates()
+        ggi_res_yes = ggi_res[(ggi_res['src_tf'] == "YES") | (ggi_res['dest_tf'] == "YES")]
+        if not ggi_res_yes.empty:
+            return lr_receptor
+    return None
+
+def find_lr_path(object, lrpairs, pathways, max_hop=None, if_doParallel=True, use_n_cores=None):
+    def check_input_data():
+        if not all(elem in lrpairs.columns for elem in ["ligand", "receptor", "species"]):
+            raise ValueError("Please provide a correct lrpairs data.frame! See demo_lrpairs!")
+
+        if not all(elem in pathways.columns for elem in ["src", "dest", "pathway", "source", "type", "src_tf", "dest_tf", "species"]):
+            raise ValueError("Please provide a correct pathways data.frame! See demo_pathways!")
+    check_input_data()
+    species = object['para']['species']
+    st_data = get_st_data(object)
+    lrpair = lrpairs[(lrpairs['species'] == species) & (lrpairs['ligand'].isin(st_data.index)) & (lrpairs['receptor'].isin(st_data.index))]
+    if lrpair.empty:
+        raise ValueError("No ligand-recepotor pairs found in st_data!")
+
+    pathways = pathways[(pathways['species'] == species) & (pathways['src'].isin(st_data.index)) & (pathways['dest'].isin(st_data.index))]
+    ggi_tf = pathways[["src", "dest", "src_tf", "dest_tf"]].drop_duplicates()
+
+    lrpair = lrpair[lrpair['receptor'].isin(ggi_tf['src'])]
+    if lrpair.empty:
+        raise ValueError("No downstream target genes found for receptors!")
+
+    if max_hop is None:
+        max_hop = 4 if species == "Mouse" else 3
+
+    receptor_name = lrpair['receptor'].unique()
+
+    if use_n_cores is None:
+        n_cores = cpu_count() // 2
+        if n_cores < 2:
+            if_doParallel = False
+    else:
+        n_cores = use_n_cores
+
+    if if_doParallel:
+        args = [(i, receptor_name, max_hop, st_data, ggi_tf) for i in range(len(receptor_name))]
+        with Pool(n_cores) as p:
+            res_ggi = p.map(find_receptor_tf, args)
+            res_ggi = [i for i in res_ggi if i is not None]
+    else:
+        res_ggi = []
+        for i in range(len(receptor_name)):
+            result = find_receptor_tf((i, receptor_name, max_hop, st_data, ggi_tf))
+            if result is not None:
+                res_ggi.append(result)
+
+    if not res_ggi:
+        raise ValueError("No downstream transcriptional factors found for receptors!")
+
+    lrpair = lrpair[lrpair['receptor'].isin(res_ggi)]
+    if lrpair.empty:
+        raise ValueError("No ligand-recepotor pairs found!")
+
+    object['lr_path'] = {"lrpairs": lrpair, "pathways": pathways}
+    object['para']["max_hop"] = max_hop
+    if_skip_dec_celltype = object['para']["if_skip_dec_celltype"]
+    if if_skip_dec_celltype:
+        st_meta = object['meta']["rawmeta"]
+        # implement .st_dist function
+        st_distance = st_dist(st_meta)
+        object['dist'] = st_distance
+
+    return object
+
+
+def get_cellpair(celltype_dist, st_meta, celltype_sender, celltype_receiver, n_neighbor):
+    cell_sender = st_meta.loc[st_meta['celltype'] == celltype_sender, :]
+    cell_receiver = st_meta.loc[st_meta['celltype'] == celltype_receiver, :]
+    cell_pair = {}
+    
+    for j in range(cell_sender.shape[0]):
+        celltype_dist1 = celltype_dist[cell_sender.iloc[j, :]['cell']]
+        celltype_dist1 = celltype_dist1[celltype_dist1 > 0]
+        celltype_dist1 = celltype_dist1.sort_values()
+        # celltype_dist1 = celltype_dist1.head(100)
+        cell_pair[j] = celltype_dist1[celltype_dist1 < 200].index.tolist()
+    cell_pair = dict(zip(cell_sender["cell"], cell_pair.values()))
+    keys = []
+    values = []
+    for key, vals in cell_pair.items():
+        keys.extend([key for _ in range(len(vals))])
+        values.extend(vals)
+    cell_pair = pd.DataFrame({'Key': keys, 'Value': values})
+    
+    cell_pair = pd.DataFrame({'cell_sender': keys, 'cell_receiver': values})
+    cell_pair['cell_sender'] = cell_pair['cell_sender'].astype(str)
+    cell_pair = cell_pair[cell_pair['cell_receiver'].isin(cell_receiver['cell'])]
+    
+    return cell_pair
+
+def lr_distance(st_data, cell_pair, lrdb, celltype_sender, celltype_receiver, per_num, pvalue):
+    
+    def co_exp(x):
+        x_1 = x[:(len(x)//2)]
+        x_2 = x[(len(x)//2):]
+        x_12 = x_1 * x_2
+        x_12_ratio = len(x_12[x_12 > 0]) / len(x_12)
+        return x_12_ratio
+    
+    def co_exp_p(x):
+        x_real = x[-1]
+        x_per = x[:-1]
+        x_p = len(x_per[x_per >= x_real]) / len(x_per)
+        return x_p
+    
+    # [1] LR distance
+    lrdb['celltype_sender'] = celltype_sender
+    lrdb['celltype_receiver'] = celltype_receiver
+    lrdb['lr_co_exp_num'] = 0
+    lrdb['lr_co_ratio'] = 0
+    lrdb['lr_co_ratio_pvalue'] = 1
+    lrdb.index = np.arange(1, len(lrdb)+1)
+    
+    ndata_ligand = pd.DataFrame(data=st_data, index = lrdb['ligand'].values, columns=cell_pair['cell_sender'].values)
+    ndata_receptor = pd.DataFrame(data=st_data, index = lrdb['receptor'].values, columns=cell_pair['cell_receiver'].values)
+    # calculate co-expression ratio
+    #print(ndata_ligand)
+    if len(lrdb) == 1:
+        ndata_lr = ndata_ligand.values * ndata_receptor.values
+        lrdb['lr_co_exp_num'] = len(ndata_lr[ndata_lr > 0])
+        lrdb['lr_co_ratio'] = len(ndata_lr[ndata_lr > 0]) / len(ndata_lr)
+    else:
+        #ndata_ligand = pd.DataFrame(data=st_data, index = lrdb['ligand'].values, columns=cell_pair['cell_sender'].values)
+        #ndata_receptor = pd.DataFrame(data=st_data, index = lrdb['receptor'].values, columns=cell_pair['cell_receiver'].values)
+        ndata_lr = np.column_stack((ndata_ligand, ndata_receptor))
+        lrdb['lr_co_ratio'] = np.apply_along_axis(co_exp, 1, ndata_lr)
+        lrdb['lr_co_exp_num'] = np.apply_along_axis(co_exp, 1, ndata_lr) * len(cell_pair)
+
+    # permutation test
+    res_per = {}
+    for j in range(1, per_num+1):
+        #print(j)
+        random.seed(j)
+
+        cell_id = random.choices(range(st_data.shape[1]), k=len(cell_pair)*2)
+
+        ndata_ligand = pd.DataFrame(data=st_data, index = lrdb['ligand'].values, columns=st_data.columns[cell_id[:len(cell_id)//2]])
+        ndata_receptor = pd.DataFrame(data=st_data, index = lrdb['receptor'].values, columns=st_data.columns[cell_id[(len(cell_id)//2):]])
+        #print(ndata_ligand)
+        if len(lrdb) == 1:
+            ndata_lr = ndata_ligand.values * ndata_receptor.values
+            #print(ndata_lr)
+            #print(len(ndata_lr[ndata_lr > 0]) / len(ndata_lr))
+            res_per[f'P{j}'] = [len(ndata_lr[ndata_lr > 0]) / len(ndata_lr)]
+        else:
+            ndata_lr = np.column_stack((ndata_ligand, ndata_receptor))
+            res_per[f'P{j}'] = np.apply_along_axis(co_exp, 1, ndata_lr)
+    
+    res_per = pd.DataFrame(res_per)
+    res_per['real'] = lrdb['lr_co_ratio']
+    lrdb['lr_co_ratio_pvalue'] = np.apply_along_axis(co_exp_p, 1, res_per.values)
+    lrdb = lrdb[lrdb['lr_co_ratio_pvalue'] < pvalue]
+    #print(lrdb)
+    return lrdb
+
+    
+def get_tf_res(celltype_sender, celltype_receiver, lrdb, ggi_tf, cell_pair, st_data, max_hop, co_exp_ratio):
+
+    def co_exp(x):
+        x_1 = x[:len(x)//2]
+        x_2 = x[len(x)//2:len(x)]
+        x_12 = [a*b for a, b in zip(x_1, x_2)]
+        
+        x_12_ratio = len([a for a in x_12 if a > 0]) / len(x_12)
+        #print(x_12_ratio)
+        return x_12_ratio
+    
+    def co_exp_batch(st_data, ggi_res, cell_pair):
+        ggi_res_temp = ggi_res[['src', 'dest']].drop_duplicates()
+        cell_receiver = cell_pair['cell_receiver'].unique()
+        m = len(ggi_res_temp) // 5000
+        i = 1
+        res = pd.DataFrame()
+        while i <= (m + 1):
+            m_int = 5000 * i
+            if m_int < len(ggi_res_temp):
+                ggi_res_temp1 = ggi_res_temp[((i - 1) * 5000):(5000 * i)].reset_index(drop=True)
+            else:
+                if m_int == len(ggi_res_temp):
+                    ggi_res_temp1 = ggi_res_temp[((i - 1) * 5000):(5000 * i)].reset_index(drop=True)
+                    i += 1
+                else:
+                    ggi_res_temp1 = ggi_res_temp[((i - 1) * 5000):].reset_index(drop=True)
+            
+            #ndata_src = st_data.loc[ggi_res_temp1['src'], cell_receiver]
+            #ndata_dest = st_data.loc[ggi_res_temp1['dest'], cell_receiver]
+            ndata_src = pd.DataFrame(data=st_data, index = ggi_res_temp1['src'].values, columns = cell_receiver)
+            ndata_dest = pd.DataFrame(data=st_data, index = ggi_res_temp1['dest'].values, columns = cell_receiver)
+            
+            ndata_gg = pd.concat([ndata_src, ndata_dest], axis=1)
+            
+            ggi_res_temp1['co_ratio'] = np.nan
+            ggi_res_temp1['co_ratio'] = ndata_gg.apply(co_exp, axis=1)
+            res = pd.concat([res, ggi_res_temp1], ignore_index=True)
+            i += 1
+        
+        res['merge_key'] = res['src'].astype(str) + res['dest'].astype(str)
+        ggi_res['merge_key'] = ggi_res['src'].astype(str) + ggi_res['dest'].astype(str)
+        ggi_res = pd.merge(ggi_res, res, on='merge_key', how='left').iloc[:, 1:6]
+        ggi_res.columns = ['src', 'dest', 'src_tf', 'dest_tf', 'hop', 'co_ratio']
+        return ggi_res
+    
+    def generate_ggi_res(ggi_tf, cell_pair, receptor_name, st_data, max_hop, co_exp_ratio):
+        ggi_res = pd.DataFrame()
+        ggi_tf1 = ggi_tf[ggi_tf['src'] == receptor_name].copy()
+        ggi_tf1 = ggi_tf1[ggi_tf1['dest'].isin(st_data.index)].drop_duplicates(subset=['dest'])
+        n = 0
+        ggi_tf1['hop'] = n + 1
+        while n <= max_hop:
+            ggi_res = pd.concat([ggi_res, ggi_tf1], ignore_index=True)
+            ggi_tf1 = ggi_tf[ggi_tf['src'].isin(ggi_tf1['dest'])].copy()
+            ggi_tf1 = ggi_tf1[ggi_tf1['dest'].isin(st_data.index)].drop_duplicates(subset=['dest'])
+            if len(ggi_tf1) == 0:
+                break
+            ggi_tf1['hop'] = n + 2
+            n += 1
+        ggi_res = ggi_res.drop_duplicates()
+        ggi_res_temp = ggi_res[['src', 'dest']].drop_duplicates()
+        
+        if len(ggi_res_temp) >= 5000:
+            ggi_res = co_exp_batch(st_data, ggi_res, cell_pair)
+        else:
+            ndata_src = st_data.loc[ggi_res['src'], cell_pair['cell_receiver']].copy()
+            ndata_src['index_name'] = ndata_src.groupby(ndata_src.index).cumcount()
+            ndata_src['index_name'] = ndata_src['index_name'].astype(str)
+            ndata_src['index_name'] = ndata_src['index_name'].apply(lambda x: '.' + x if x != '0' else '')
+            ndata_src.index = ndata_src.index + ndata_src['index_name']
+            ndata_src = ndata_src.drop('index_name', axis=1)
+            ndata_dest = st_data.loc[ggi_res['dest'], cell_pair['cell_receiver']].copy()
+            ndata_dest['index_name'] = ndata_dest.groupby(ndata_dest.index).cumcount()
+            ndata_dest['index_name'] = ndata_dest['index_name'].astype(str)
+            ndata_dest['index_name'] = ndata_dest['index_name'].apply(lambda x: '.' + x if x != '0' else '')
+            ndata_dest.index = ndata_dest.index + ndata_dest['index_name']
+            ndata_dest = ndata_dest.drop('index_name', axis=1)
+            ndata_dest.index = ndata_src.index 
+            ndata_gg = pd.concat([ndata_src, ndata_dest], axis=1)
+            ggi_res['co_ratio'] = np.nan
+            #print(ndata_gg.apply(co_exp, axis=1))
+            ggi_res['co_ratio'] = ndata_gg.apply(co_exp, axis=1).values
+            #print(ggi_res['co_ratio'])
+        ggi_res = ggi_res[ggi_res['co_ratio'] > co_exp_ratio]
+    
+        return ggi_res
+    
+    def generate_tf_gene_all(ggi_res, max_hop):
+        tf_gene_all = {}
+        ggi_hop = ggi_res[ggi_res['hop'] == 1]
+        for k in range(max_hop):
+            ggi_hop_yes = ggi_hop[ggi_hop['dest_tf'] == 'YES']
+            if not ggi_hop_yes.empty:
+                ggi_hop_tf = ggi_res[ggi_res['hop'] == k + 2]
+                if not ggi_hop_tf.empty:
+                    ggi_hop_yes = ggi_hop_yes[ggi_hop_yes['dest'].isin(ggi_hop_tf['src'])]
+                    if not ggi_hop_yes.empty:
+                        tf_gene = ggi_hop_yes['hop']
+                        tf_gene.index = ggi_hop_yes['dest']
+                        tf_gene_all.update(tf_gene.to_dict())
+            ggi_hop_no = ggi_hop[ggi_hop['dest_tf'] == 'NO']
+            ggi_hop = ggi_res[ggi_res['hop'] == k + 2]
+            ggi_hop = ggi_hop[ggi_hop['src'].isin(ggi_hop_no['dest'])]
+        return tf_gene_all
+    
+    
+    def generate_tf_res(tf_gene_all, celltype_sender, celltype_receiver, receptor_name, ggi_res):
+        receptor_tf_temp = pd.DataFrame({
+            'celltype_sender': celltype_sender,
+            'celltype_receiver': celltype_receiver,
+            'receptor': receptor_name,
+            'tf': list(tf_gene_all.keys()),
+            'n_hop': list(tf_gene_all.to_dict().values()),
+            'n_target': 0
+        })
+    
+        for i, tf_name in enumerate(receptor_tf_temp['tf']):
+            tf_n_hop = receptor_tf_temp['n_hop'][i]
+            ggi_res_tf = ggi_res[(ggi_res['src'] == tf_name) & (ggi_res['hop'] == tf_n_hop + 1)]
+            receptor_tf_temp.at[i, 'n_target'] = len(pd.unique(ggi_res_tf['dest']))
+        
+        return receptor_tf_temp
+    
+
+    def random_walk(receptor_tf, ggi_res):
+        receptor_name = receptor_tf['receptor'].unique()
+        tf_score = pd.Series(np.zeros(len(receptor_tf)), index=receptor_tf['tf'])
+        max_n_hop = 10
+        
+        for i in range(1000):
+            ggi_res1 = ggi_res[ggi_res['src'].isin(receptor_name)].copy()
+            n_hop = 1
+            
+            while len(ggi_res1) > 0 and n_hop <= max_n_hop:
+                target_name = random.sample(range(len(ggi_res1)), k=1)[0]
+                ggi_res1 = ggi_res1.iloc[target_name]
+    
+                if ggi_res1['dest'] in tf_score.index:
+                    tf_score[ggi_res1['dest']] += 1
+    
+                ggi_res1 = ggi_res[ggi_res['src'] == ggi_res1['dest']].copy()
+                n_hop += 1
+        #print(tf_score)
+        tf_score = tf_score / 1000
+        return tf_score
+    
+    receptor_tf = pd.DataFrame()
+    receptor_name = lrdb['receptor'].unique()
+    for j in range(len(receptor_name)):
+        ggi_res = generate_ggi_res(ggi_tf, cell_pair, receptor_name[j], st_data, max_hop, co_exp_ratio)
+        if ggi_res.shape[0] > 0:
+            tf_gene_all = generate_tf_gene_all(ggi_res, max_hop)
+            tf_gene_all = pd.DataFrame({'gene': list(tf_gene_all.keys()), 'hop': list(tf_gene_all.values())})
+            tf_gene_all = tf_gene_all.drop_duplicates()
+            tf_gene_all.index = tf_gene_all['gene']
+            tf_gene_all = tf_gene_all['hop']
+            ggi_res['dest_tf_enrich'] = "NO"
+            if not tf_gene_all.empty:
+                ggi_res.loc[ggi_res['dest'].isin(tf_gene_all.index), 'dest_tf_enrich'] = "YES"
+                receptor_tf_temp = generate_tf_res(tf_gene_all, celltype_sender, celltype_receiver, receptor_name[j], ggi_res)
+                receptor_tf_temp['score'] = random_walk(receptor_tf_temp, ggi_res).values
+                receptor_tf = pd.concat([receptor_tf, receptor_tf_temp])
+    return receptor_tf
+
+
+def get_score(lrdb, receptor_tf):
+    lrdb_copy = lrdb.copy()
+    lrdb_copy['score'] = 0
+    
+    for j in range(len(lrdb_copy)):
+        receptor_name = lrdb_copy.reset_index(drop=True).loc[j, 'receptor']
+        score_lr = 1 - lrdb_copy.reset_index(drop=True).loc[j, 'lr_co_ratio_pvalue']
+        if 'receptor' in receptor_tf:
+            if receptor_name in receptor_tf['receptor'].values:
+                #receptor_tf_temp = receptor_tf[receptor_tf['receptor'] == receptor_name]
+                receptor_tf_temp = receptor_tf[receptor_tf['receptor'] == receptor_name].copy()
+                if (receptor_tf_temp['n_target'] == 0).any() or (receptor_tf_temp['n_hop'] == 0).any():
+                    continue
+                receptor_tf_temp['score_rt'] = receptor_tf_temp['n_target'] * receptor_tf_temp['score'] / receptor_tf_temp['n_hop']
+                score_rt = sum(receptor_tf_temp['score_rt']) * (-1)
+                score_rt = 1 / (1 + np.exp(score_rt))
+                lrdb_copy['score'] = np.sqrt(score_lr * score_rt)
+    lrdb_filtered = lrdb_copy[lrdb_copy['score'] > 0]
+    if len(lrdb_filtered) > 0:
+        return lrdb_filtered
+
+
+def process_data(i, celltype_pair, lrdb, max_hop, cellname, st_meta, st_data,celltype_dist, pathways, n_neighbor, 
+                 min_pairs, min_pairs_ratio, per_num, pvalue, co_exp_ratio, ggi_tf):
+    cell_sender = st_meta[st_meta['celltype'] == celltype_pair.iloc[i]['celltype_sender']]
+    cell_receiver = st_meta[st_meta['celltype'] == celltype_pair.iloc[i]['celltype_receiver']]
+    cell_pair_all = int(cell_sender.shape[0] * cell_receiver.shape[0] / 2)
+    
+    cell_pair = get_cellpair(celltype_dist, st_meta, celltype_pair.iloc[i]['celltype_sender'], celltype_pair.iloc[i]['celltype_receiver'], n_neighbor)
+    
+    if cell_pair.shape[0] > min_pairs and cell_pair.shape[0] > cell_pair_all * min_pairs_ratio:
+        #lrdb = object['lr_path']['lrpairs']
+        lrdb = lr_distance(st_data, cell_pair, lrdb, celltype_pair.iloc[i]['celltype_sender'], celltype_pair.iloc[i]['celltype_receiver'], per_num, pvalue)
+        #print(lrdb)
+        #max_hop = object['para']['max_hop']
+        receptor_tf = None
+        if lrdb.shape[0] > 0:
+            receptor_tf = get_tf_res(celltype_pair.iloc[i]['celltype_sender'], celltype_pair.iloc[i]['celltype_receiver'], lrdb, ggi_tf, cell_pair, st_data, max_hop, co_exp_ratio)
+            if receptor_tf is not None:
+                lrdb = get_score(lrdb, receptor_tf)
+            #else:
+                #lrdb = None
+        if lrdb is not None and lrdb.shape[0] > 0:
+            return lrdb, receptor_tf, cell_pair
+    #return None
+
+def dec_cci(object, n_neighbor=10, min_pairs=5, min_pairs_ratio=0, per_num=1000, pvalue=0.05, 
+    co_exp_ratio=0.1, if_doParallel=True, use_n_cores=None):
+
+    if use_n_cores is None:
+        n_cores = multiprocessing.cpu_count()
+        n_cores = int(n_cores / 2)
+        if n_cores < 2:
+            if_doParallel = False
+    else:
+        n_cores = use_n_cores
+
+    if if_doParallel:
+        pool = multiprocessing.Pool(n_cores)
+
+    st_meta = get_st_meta(object)
+    st_data = get_st_data(object)
+    celltype_dist = object['dist']
+
+    # generate pair-wise cell types
+    cellname = np.unique(st_meta['celltype'])
+    celltype_pair = None
+    for i in range(len(cellname)):
+        d1 = pd.DataFrame({'celltype_sender': np.repeat(cellname[i], len(cellname)),
+                           'celltype_receiver': cellname})
+        celltype_pair = pd.concat([celltype_pair, d1], ignore_index=True)
+    celltype_pair = celltype_pair[celltype_pair['celltype_sender'] != celltype_pair['celltype_receiver']]
+
+    pathways = object['lr_path']['pathways']
+    ggi_tf = pathways[['src', 'dest', 'src_tf', 'dest_tf']].drop_duplicates()
+    lrdb = object['lr_path']['lrpairs']
+    max_hop = object['para']['max_hop']
+    all_res = pool.starmap(process_data, zip(range(celltype_pair.shape[0]), repeat(celltype_pair), repeat(lrdb), repeat(max_hop),
+                                                  repeat(cellname), repeat(st_meta), repeat(st_data), repeat(celltype_dist),repeat(pathways),
+                                                  repeat(n_neighbor), repeat(min_pairs), repeat(min_pairs_ratio),
+                                                  repeat(per_num), repeat(pvalue), repeat(co_exp_ratio),repeat(ggi_tf)))
+
+    pool.close()
+    pool.join()
+
+    res_receptor_tf = pd.DataFrame()
+    res_lrpair = pd.DataFrame()
+    res_cellpair = {}
+    m = 0
+    for i in range(len(all_res)):
+        all_res1 = all_res[i]
+        if all_res1 is not None:
+            m += 1
+            res_lrpair = pd.concat([res_lrpair, all_res1[0]], ignore_index=True)
+            res_receptor_tf = pd.concat([res_receptor_tf, all_res1[1]], ignore_index=True)
+            key = f"{np.unique(all_res1[0]['celltype_sender'].to_list())} -- {np.unique(all_res1[0]['celltype_receiver'].to_list())}"
+            res_cellpair[key] = all_res1[2]
+
+    object['lrpair'] = res_lrpair if not res_lrpair.empty else None
+    object['tf'] = res_receptor_tf if not res_receptor_tf.empty else None
+    object['cellpair'] = res_cellpair if len(res_cellpair) > 0 else None
+    object['para'] = {'min_pairs': min_pairs, 'min_pairs_ratio': min_pairs_ratio, 'per_num': per_num, 'pvalue': pvalue, 'co_exp_ratio': co_exp_ratio}
+
+    return object
+
+def cell_pair_all(object):
+    st_meta = object['meta']['rawmeta']
+    st_data = object['data']['rawdata']
+    cellname = np.unique(st_meta['celltype'])
+    cellname = sorted(cellname)
+    lrpair = object['lrpair']
+    cell_pair_all = pd.DataFrame(columns=['cell_sender', 'cell_receiver', 'label'])
+
+    for j in range(len(lrpair)):
+        celltype_sender = lrpair.iloc[j]['celltype_sender']
+        celltype_receiver = lrpair.iloc[j]['celltype_receiver']
+        ligand = lrpair.iloc[j]['ligand']
+        receptor = lrpair.iloc[j]['receptor']
+        cell_pair = object['cellpair']
+        cell_pair = cell_pair[f"{[celltype_sender]} -- {[celltype_receiver]}"]
+        st_data = st_data[st_meta['cell']]
+        st_meta['ligand'] = pd.to_numeric(st_data.loc[ligand, :]).values
+        st_meta['receptor'] = pd.to_numeric(st_data.loc[receptor, :]).values
+        st_meta_ligand = st_meta[(st_meta['celltype'] == celltype_sender) & (st_meta['ligand'] > 0)]
+        st_meta_receptor = st_meta[(st_meta['celltype'] == celltype_receiver) & (st_meta['receptor'] > 0)]
+        cell_pair1 = cell_pair[cell_pair['cell_sender'].isin(st_meta_ligand['cell'])].copy()
+        cell_pair1 = cell_pair[cell_pair['cell_receiver'].isin(st_meta_receptor['cell'])].copy()
+        cell_pair['celltype_sender'] = celltype_sender
+        cell_pair['celltype_receiver'] = celltype_receiver
+        cell_pair['ligand'] = ligand
+        cell_pair['receptor'] = receptor
+        cell_pair['id'] = range(len(cell_pair))
+        cell_pair1['id'] = range(len(cell_pair1))
+        cell_pair1['label'] = 1
+        cell_pair.loc[cell_pair['id'].isin(cell_pair1['id']), 'label'] = 1
+        cell_pair.drop(columns=['id'], inplace=True)
+        cell_pair_all = pd.concat([cell_pair_all, cell_pair])
+    return cell_pair_all,object['lr_path']['lrpairs']
+
+def DecCCC(st_data, pathways, lrpairs, meta_data, species, outdir):
+    
+    import time
+    #st_data = pd.read_csv(st_data, index_col=0)
+    pathways = pd.read_csv(pathways, index_col=0)
+    #lrpairs = pd.read_csv(lrpairs)
+    start_time = time.time()
+    deeptalk = createDeepTalk(st_data = st_data, st_meta = meta_data.iloc[:,:3], species = species,
+                          if_st_is_sc=True, spot_max_cell=1, celltype=meta_data['celltype'])
+
+    deeptalk = find_lr_path(deeptalk,lrpairs, pathways, max_hop=4, if_doParallel=True, use_n_cores=None)
+
+    deeptalk = dec_cci(deeptalk, n_neighbor=10, min_pairs=5, min_pairs_ratio=0, per_num=1000, pvalue=0.05, 
+        co_exp_ratio=0.1, if_doParallel=True, use_n_cores=None)
+
+    cell_pair_all1,lrpairs = cell_pair_all(deeptalk)
+    end_time = time.time()
+    execution_time = end_time - start_time
+    #print(f"Execution time: {execution_time} seconds")
+    return cell_pair_all1,lrpairs
+
+def DecCCC_pre(st_data, pathways, lrpairs, meta_data, species, outdir):
+    import time
+    #st_data = pd.read_csv(st_data, index_col=0)
+    pathways = pd.read_csv(pathways, index_col=0)
+    #lrpairs = pd.read_csv(lrpairs)
+    start_time = time.time()
+    deeptalk = createDeepTalk(st_data = st_data, st_meta = meta_data.iloc[:,:3], species = species,
+                          if_st_is_sc=True, spot_max_cell=1, celltype=meta_data['celltype'])
+
+    deeptalk = find_lr_path(deeptalk,lrpairs, pathways, max_hop=4, if_doParallel=True, use_n_cores=None)
+
+    deeptalk = dec_cci(deeptalk, n_neighbor=10, min_pairs=5, min_pairs_ratio=0, per_num=1, pvalue=0.05, 
+        co_exp_ratio=0.1, if_doParallel=True, use_n_cores=None)
+
+    cell_pair_all1,lrpairs = cell_pair_all(deeptalk)
+    end_time = time.time()
+    execution_time = end_time - start_time
+    #print(f"Execution time: {execution_time} seconds")
+    return cell_pair_all1,lrpairs
+
+
+'''
+Testdir = '/mnt/test/a3/NewDeepTalk/test/single-cell'
+
+pathways = Testdir + "/pathways.csv"
+lrpairs = Testdir + "/lrpairs_new.csv"
+st_data = Testdir + "/ad_st_new.csv"
+species = "Mouse"
+outdir = Testdir
+my_dataframe = Testdir + "/st_obs.csv"
+
+my_dataframe = pd.read_csv(my_dataframe)
+my_dataframe.columns.values[0] = "cell"
+my_column = my_dataframe.iloc[:, 0] + 1
+my_column_with_prefix = "C" + my_column.astype(str)
+my_dataframe.iloc[:, 0] = my_column_with_prefix
+st_coef = my_dataframe.iloc[:, 5:]
+cellname = st_coef.columns
+my_dataframe["celltype"] = ""
+for i in range(st_coef.shape[0]):
+    st_coef1 = st_coef.iloc[i, :]
+    my_dataframe.iloc[i, my_dataframe.columns.get_loc('celltype')] = st_coef1.idxmax()
+my_dataframenew = my_dataframe[['cell', 'x', 'y', 'celltype']]
+my_dataframenew.to_csv(outdir + "/st_meta.csv")
+
+newmeta = pd.read_csv(outdir + "/st_meta.csv")
+meta_data = newmeta[['cell','x','y','celltype']]
+
+
+cell_pair_all,lrpairs = DecCCC(st_data, pathways, lrpairs, meta_data, species, outdir)
+'''
+'''
+Testdir = '/mnt/test/a3/NewDeepTalk/test/spot'
+
+pathways = Testdir + "/pathways.csv"
+lrpairs = Testdir + "/lrpairs_new.csv"
+my_dataframe = Testdir + "/st_obs.csv"
+st_data = Testdir + "/ad_st_new.csv"
+species = "Mouse"
+outdir = Testdir
+
+newmeta = pd.read_csv(my_dataframe)
+newmeta.columns.values[0] = "cell"
+newmeta['cell'] = newmeta['cell'] + 1
+newmeta['cell'] = 'C' + newmeta['cell'].astype(str)
+newmeta.rename(columns={'cluster': 'celltype'}, inplace=True)
+newmeta['spot'] = newmeta['centroids'].str.replace(r"_.*", "")
+newmeta['celltype'] = newmeta['celltype'].str.replace(" ", "_")
+newmeta.to_csv(outdir + "/st_meta.csv")
+
+newmeta = pd.read_csv(outdir + "/st_meta.csv")
+meta_data = newmeta[['cell','x','y','celltype']]
+
+cell_pair_all1,lrpairs = DecCCC(st_data, pathways, lrpairs, meta_data, species, outdir)
+'''
 
 
 
-    # 设置x轴和y轴刻度
-    plt.xticks(np.arange(len(df.columns)), df.columns, rotation=90,fontsize=8, ha='center')
-    plt.yticks(np.arange(len(df.index)), df.index, fontsize=8)
 
-    # 添加颜色栏
-    plt.colorbar()
-    #plt.savefig('./fig/Heatmap_all.pdf',bbox_inches='tight',dpi=300)
-    # 显示图形
-    plt.show()
+def generate_newmeta_spot(spot_name, newmeta, st_ndata, sc_ndata, sc_celltype, iter_num):
+    newmeta_spot = newmeta[newmeta['spot'] == spot_name].copy()
+    #newmeta_spot = newmeta[newmeta['spot'] == spot_name]
+    spot_ndata = np.array(st_ndata[spot_name])
+    score_cor = []
+    spot_cell_id = []
+    for k in range(iter_num):
+        spot_cell_id_k = []
+        for j in range(len(newmeta_spot)):
+            spot_celltype = newmeta_spot['celltype'].iloc[j]
+            sc_celltype1 = sc_celltype[sc_celltype['celltype'] == spot_celltype]['cell'].values
+            sc_celltype1 = np.random.choice(sc_celltype1, size=1)
+            spot_cell_id_k.extend(sc_celltype1)
+        if len(spot_cell_id_k) == 1:
+            spot_ndata_pred = np.array(sc_ndata[spot_cell_id_k[0]])
+        else:
+            spot_ndata_pred = np.array(sc_ndata[spot_cell_id_k].sum(axis=1))
+        spot_ndata_cor = np.corrcoef(spot_ndata, spot_ndata_pred)[0, 1]
+        score_cor.append(spot_ndata_cor)
+        spot_cell_id.append(spot_cell_id_k)
+    spot_cell_id = spot_cell_id[np.argmax(score_cor)]
+    #newmeta_spot['cell_id'] = spot_cell_id
+    #newmeta_spot['cor'] = np.max(score_cor)
+    newmeta_spot.loc[:, 'cell_id'] = spot_cell_id
+    newmeta_spot.loc[:, 'cor'] = np.max(score_cor)
+    return newmeta_spot
+
+def generate_newmeta_cell(newmeta, st_ndata, sc_ndata, sc_celltype, iter_num, n_cores, if_doParallel):
+    newmeta_spotname = np.unique(newmeta['spot'])
+    newmeta_cell = None
+    if if_doParallel:
+        cl = Pool(n_cores)
+        partial_func = partial(generate_newmeta_spot, newmeta=newmeta, st_ndata=st_ndata, sc_ndata=sc_ndata, sc_celltype=sc_celltype, iter_num=iter_num)
+        newmeta_cell = cl.map(partial_func, newmeta_spotname)
+        cl.close()
+        cl.join()
+    else:
+        for spot_name in newmeta_spotname:
+            newmeta_spot = generate_newmeta_spot(spot_name, newmeta, st_ndata, sc_ndata, sc_celltype, iter_num)
+            newmeta_cell = pd.concat([newmeta_cell, newmeta_spot], ignore_index=True)
+    newmeta_cell = pd.concat(newmeta_cell)
+    return newmeta_cell
 
 
+
+'''
+Testdir = '/mnt/test/a3/NewDeepTalk/test/spot'
+
+ad_sc = Testdir + "/ad_sc.csv"
+ad_ge = Testdir + "/ad_ge.csv"
+st_obs = Testdir + "/st_obs.csv"
+sc_obs = Testdir + "/sc_obs.csv"
+newSTdata = Testdir + "/newdata.csv"
+'''
+def New_NSST_data(ad_sc, ad_ge_new, st_obs, sc_obs, if_doParallel = True,use_n_cores = None):
+
+    if use_n_cores is None:
+        n_cores = multiprocessing.cpu_count()
+        n_cores = int(n_cores / 4)
+        if n_cores < 2:
+            if_doParallel = False
+    else:
+        n_cores = use_n_cores
+
+    #sc_data = pd.read_csv(ad_sc, index_col=0)
+    #st_data = pd.read_csv(ad_ge, index_col=0)
+    sc_data = ad_sc
+    st_data = ad_ge_new
+    st_data.columns = st_data.columns.str.replace(".", "-")
+    st_data.columns = st_data.columns.str.upper()
+    #newmeta = pd.read_csv(st_obs)
+    newmeta = st_obs
+
+    newmeta.columns = newmeta.columns.str.replace(".", "-")
+    newmeta.insert(0, 'cell', newmeta.index)
+    newmeta["cell"] = newmeta["cell"].astype(int) + 1
+    newmeta["cell"] = "C" + newmeta["cell"].astype(str)
+    newmeta['spot'] = newmeta['centroids'].apply(lambda x: x.split('_')[0])
+    newmeta.rename(columns={'cluster': 'celltype'}, inplace=True)
+    newmeta["celltype"] = newmeta["celltype"].str.replace(" ", "_")
+
+    #scmeta = pd.read_csv(sc_obs)
+    scmeta = sc_obs
+    sc_celltype = scmeta["cell_subclass"]
+    sc_celltype_new = sc_celltype.str.replace(' ', '_').str.replace('-', '_')
+    sc_celltype = pd.DataFrame({"cell": sc_data.columns[:], "celltype": sc_celltype_new})
+
+    newmeta_cell = generate_newmeta_cell(newmeta, st_data, sc_data, sc_celltype, 100, n_cores=n_cores, if_doParallel=True)
+    #print('Done')
+    newdata = sc_data[newmeta_cell['cell_id']]
+    newdata.columns = newmeta_cell['cell']
+
+    #print('Done')
+    #newdata.to_csv(newSTdata, index=True)
+    return newdata
