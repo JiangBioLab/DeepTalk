@@ -59,17 +59,17 @@ The returned `ad_ge` is a voxel-by-gene AnnData, similar to spatial data `ad_st`
 Generating Training Files for Deep Learning using `ad_ge` :
 
 ```
-dt.File_Train(data_name, LR_train, outdir =  Test_dir)
+dt.File_Train(st_data, pathways, lrpairs_train, meta_data, species, LR_train, outdir =  Test_dir)
 ```
 ```
-dt.data_for_train(data_dir, data_name, LR_train)
+dt.data_for_train(st_data, data_dir, LR_pre)
 ```
 Generating Predicting Files for Deep Learning using `ad_ge` :
 ```
-dt.CCC_LR_pre(data_name,ligand, receptor, cell_pair, outdir)
+dt.File_Pre(st_data, pathways, lrpairs_pre, meta_data, species, LR_Pre, outdir)
 ```
 ```
-dt.data_for_test(data_dir, data_name, LR_test)
+dt.data_for_pre(st_data, data_dir, LR_pre)
 ```
 Use subgraph-based graph attention network to construct CCC networks for the ligand-receptor pairs with a spatial distance constraint:
 
