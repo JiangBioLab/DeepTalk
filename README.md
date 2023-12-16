@@ -64,6 +64,12 @@ dt.File_Train(st_data, pathways, lrpairs_train, meta_data, species, LR_train, ou
 ```
 dt.data_for_train(st_data, data_dir, LR_pre)
 ```
+
+Use subgraph-based graph attention network to construct CCC networks for the ligand-receptor pairs with a spatial distance constraint:
+
+```
+dt.Train(data_name,data_path, outdir, pretrained_embeddings, n_epochs = 50, ft_n_epochs=10)
+```
 Generating Predicting Files for Deep Learning using `ad_ge` :
 ```
 dt.File_Pre(st_data, pathways, lrpairs_pre, meta_data, species, LR_Pre, outdir)
@@ -71,11 +77,7 @@ dt.File_Pre(st_data, pathways, lrpairs_pre, meta_data, species, LR_Pre, outdir)
 ```
 dt.data_for_pre(st_data, data_dir, LR_pre)
 ```
-Use subgraph-based graph attention network to construct CCC networks for the ligand-receptor pairs with a spatial distance constraint:
-
-```
-dt.Train(data_name,data_path, outdir, pretrained_embeddings, n_epochs = 50, ft_n_epochs=10)
-```
+Predict CCC networks for ligand-receptor pair.
 ```
 dt.run_predict(data_name, data_path, outdir, pretrained_embeddings, model_path)
 ```
