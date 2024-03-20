@@ -1,4 +1,4 @@
-name: testpypi
+name: deeptalk
 channels:
   - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
   - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/
@@ -60,7 +60,7 @@ dependencies:
       - dask-image==2023.3.0
       - debugpy==1.8.0
       - decorator==5.1.1
-      - deeptalk-st==0.0.12
+      - deeptalk-st==0.0.2
       - defusedxml==0.7.1
       - docrep==0.3.2
       - docutils==0.20.1
