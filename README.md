@@ -22,11 +22,8 @@ To install DeepTalk, make sure you have [PyTorch](https://pytorch.org/) and [sca
 ```
   conda activate deeptalk-env
   pip install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio==0.8.1 -f https://download.pytorch.org/whl/torch_stable.html
+  pip install torch_cluster==1.5.9 torch_scatter==2.0.7 torch_sparse==0.6.10 torch_spline_conv==1.2.1-f https://data.pyg.org/whl/torch-1.8.0%2Bcu111.html
   pip install orderedset
-  pip install https://data.pyg.org/whl/torch-1.8.0%2Bcu111/torch_cluster-1.5.9-cp38-cp38-linux_x86_64.whl
-  pip install https://data.pyg.org/whl/torch-1.8.0%2Bcu111/torch_scatter-2.0.7-cp38-cp38-linux_x86_64.whl
-  pip install https://data.pyg.org/whl/torch-1.8.0%2Bcu111/torch_sparse-0.6.10-cp38-cp38-linux_x86_64.whl
-  pip install https://data.pyg.org/whl/torch-1.8.0%2Bcu111/torch_spline_conv-1.2.1-cp38-cp38-linux_x86_64.whl
   pip install gensim==3.8.3
   pip install DeepTalk_ST
 ```
