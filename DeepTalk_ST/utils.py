@@ -1489,7 +1489,7 @@ def plot_CCC_heatmap(cluster,st_data, ligand = 'Sst', receptor = 'Sstr2',
     # 创建样本名称列表
     sample_names = unique_cell_type
 
-    plt.imshow(result*100,cmap = 'Spectral_r')
+    plt.imshow(result,cmap = 'Spectral_r')
 
     num_rows, num_cols = result.shape
     for i in range(num_rows):
@@ -1722,7 +1722,7 @@ def File_Train(st_data, pathways, lrpairs, meta_data, species,
                       cell_pair = cell_pair_all, outdir =  outdir)
     end = time.time()
     execution_time = end - start
-    print(f"Execution time: {execution_time} seconds")
+    #print(f"Execution time: {execution_time} seconds")
     #CCC_LR_pre(data_name = data_name,ligand = LR_predict.split('_')[0], receptor = LR_predict.split('_')[1],
     #           cell_pair = outdir + '/cell_pair_all.csv', outdir = outdir)
     #import os

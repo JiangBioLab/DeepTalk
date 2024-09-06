@@ -314,7 +314,8 @@ def plot_cell_annotation_sc1(
     cmap='RdBu_r',
     ax=None
 ):
-        
+    
+    fig = plt.figure()
     # remove previous df_plot in obs
     adata_sp.obs.drop(annotation_list, inplace=True, errors="ignore", axis=1)
     # construct df_plot
@@ -323,6 +324,7 @@ def plot_cell_annotation_sc1(
     sc.pl.spatial(
         adata_sp, color=annotation_list, show=False, frameon=False, spot_size=spot_size, scale_factor=scale_factor, ax=ax, cmap=cmap, ncols=ncols
     )
+
 
 def plot_genes_sc(
     genes, 

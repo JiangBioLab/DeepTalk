@@ -1,7 +1,9 @@
 import argparse
 import json
+import random
 import os
 import time
+import shutil
 from typing import List
 import warnings
 warnings.filterwarnings('ignore')
@@ -22,7 +24,7 @@ from .src.utils.data_utils import load_pretrained_node2vec
 from .src.utils.evaluation import run_evaluation_main
 from .src.utils.link_predict import find_optimal_cutoff, link_prediction_eval
 from .src.utils.utils import get_id_map, load_pickle
-torch.set_num_threads(20)
+torch.set_num_threads(50)
 
 def get_set_embeddings_details(args):
     if not args.pretrained_embeddings:
@@ -44,7 +46,7 @@ def get_set_embeddings_details(args):
     return args.pretrained_embeddings, args.base_embedding_dim
 
 
-def get_graph(data_path, false_edge_gen):
+def get_graph(args, data_path, false_edge_gen):
     print("\n Loading graph...")
     attr_graph = GenericGraph(data_path, false_edge_gen)
     context_gen = ContextGenerator(attr_graph, args.num_walks_per_node)
@@ -69,129 +71,24 @@ def get_test_edges(paths: List[str], sep: str):
 
     return edges
 
+def Train(data_name='Sst_Sstr2',data_path='./Test/single-cell/data/',
+    outdir='./Test/single-cell/data/Sst_Sstr2/output',
+    pretrained_embeddings='./data_pca.emd',
+    n_epochs = 50,ft_n_epochs=10):
 
-def main(args):
     #torch.cuda.empty_cache()
     #os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     #os.environ["CUDA_LAUNCH_BLOCKING"]="1"
-    torch.manual_seed(1234)
-    data_path = f"{args.data_path}/{args.data_name}"
-    attr_graph, context_gen = get_graph(data_path, args.false_edge_gen)
-    attr_graph.dump_stats()
-    print(attr_graph.G)
-    stime = time.time()
-    id_maps_dir = data_path
-    ent2id = get_id_map(f"{id_maps_dir}/ent2id.txt")
-    rel2id = get_id_map(f"{id_maps_dir}/rel2id.txt")
-    print(len(ent2id), len(rel2id))
 
-    # Load pretrained embedding from CompGCN
-    if args.pretrained_method == "compgcn":
-        pretrained_node_embedding = load_pickle(args.pretrained_embeddings)
-    elif args.pretrained_method == "node2vec":
-        pretrained_node_embedding = load_pretrained_node2vec(
-            args.pretrained_embeddings, ent2id, args.base_embedding_dim
-        )
-
-    print(
-        "No. of nodes with pretrained embedding: ",
-        len(pretrained_node_embedding),
-    )
-
-    valid_path = data_path + "/valid.txt"
-    valid_edges_paths = [valid_path]
-    valid_edges = list(get_test_edges(valid_edges_paths, " "))
-    test_path = data_path + "/test.txt"
-    test_edges_paths = [test_path]
-    test_edges = list(get_test_edges(test_edges_paths, " "))
-    print("No. edges in test data: ", len(test_edges))
-    '''
-    if args.is_pre_trained:
-        link_prediction_eval(
-            valid_edges, test_edges, ent2id, rel2id, pretrained_node_embedding
-        )
-    else:
-        print("No pretrained embedding, no need to evaluate workflow 1.\n")
-    '''
-    outdir = data_path+"/outdir"
-    isExists = os.path.exists(outdir)
-    if isExists:
-        shutil.rmtree(outdir)
-        os.makedirs(outdir)
-    if not isExists:
-        os.makedirs(outdir)
-
-
-    print("***************PRETRAINING***************")
-    pre_num_batches = setup_pretraining_input(args, attr_graph, context_gen, outdir)
-    print("\n Run model for pre-training ...")
-    
-    # Masked nodes prediction
-    pred_data, true_data = run_pretraining(
-        args, attr_graph, pre_num_batches, pretrained_node_embedding, ent2id, rel2id
-    )
-    #print("\n Begin evaluation for node prediction...")
-    # accu, mse = run_evaluation(pred_data, true_data)
-    # Link prediction
-    ft_num_batches = setup_finetuning_input(args, attr_graph, context_gen)
-    print("\n !!!!")
-
-    pred_data, true_data = run_finetuning_wkfl2(
-        args, attr_graph, ft_num_batches, pretrained_node_embedding, ent2id, rel2id
-    )
-    print("\n Begin evaluation for link prediction...")
-    valid_true_data = np.array(true_data["valid"])
-    #print(valid_true_data)
-    #threshold = find_optimal_cutoff(valid_true_data, pred_data["valid"])[0]
-    threshold = 0.5
-    #print(threshold)
-    run_evaluation_main(
-        test_edges, pred_data["test"], true_data["test"], threshold, header="workflow2"
-    )
-    # evaluate_all_epochs(args, attr_graph, ft_num_batches,
-    #                    pretrained_node_embedding, ent2id, rel2id, test_edges)
-    
-    # WORKFLOW_3
-    print("***************FINETUNING***************")
-    print("\n Run model for finetuning ...")
-    (
-        pred_data_test,
-        true_data_test,
-        pred_data_valid,
-        true_data_valid,
-    ) = run_finetuning_wkfl3(
-        args, attr_graph, ft_num_batches, pretrained_node_embedding, ent2id, rel2id
-    )
-    print("\n Begin evaluation for link prediction...")
-    valid_true_data = np.array(true_data_valid)
-    #threshold = 0.5
-
-    #threshold = find_optimal_cutoff(valid_true_data, pred_data_valid)[0]
-    #save the threshold values for later use
-    #json.dump(threshold, open(args.outdir + "/thresholds.json", "w"))
-    y_true,y_scores = run_evaluation_main(
-        test_edges, pred_data_test, true_data_test, threshold, header="workflow3"
-    )
-    #np.save('./out/EFNA5_EPHA2/y_true.npy', y_true)
-    #np.save('./out/EFNA5_EPHA2/y_pred.npy', y_scores)
-    # evaluate after context inference
-
-    etime = time.time()
-    elapsed = etime - stime
-    print(f"running time(seconds) on {args.data_name} data: {elapsed}")
-    
-def CCC_Predict(data_name='Sst_Sstr2',data_path='./Example/single-cell/data/',
-    outdir='./Example/single-cell/data/Sst_Sstr2/output',
-    pretrained_embeddings='./Example/single-cell/data/Sst_Sstr2/data_pca.emd'):
-    torch.manual_seed(1234)
+    #torch.manual_seed(1234)
     parser = argparse.ArgumentParser()
     parser.add_argument("--device", default="cuda:0", type=str, help='specify device')
-    #parser.add_argument("--data_name", default="EFNA5_EPHA2", help="name of the dataset")
-    #parser.add_argument("--data_path", default="/mnt/test/a3/DeepSpa/dataset/PDAC/data/", help="path to dataset")
-    #parser.add_argument("--outdir", default="/mnt/test/a3/DeepSpa/dataset/PDAC/data/EFNA5_EPHA2/output", help="path to output dir")
-    #parser.add_argument(
-    #    "--pretrained_embeddings", default="/mnt/test/a3/DeepSpa/dataset/PDAC/data/EFNA5_EPHA2/data_pca.emd",help="absolute path to pretrained embeddings"
-    #)
+    parser.add_argument("--data_name", default="EFNA5_EPHA2", help="name of the dataset")
+    parser.add_argument("--data_path", default="/mnt/test/a3/DeepSpa/dataset/PDAC/data/", help="path to dataset")
+    parser.add_argument("--outdir", default="/mnt/test/a3/DeepSpa/dataset/PDAC/data/EFNA5_EPHA2/output", help="path to output dir")
+    parser.add_argument(
+        "--pretrained_embeddings", default="/mnt/test/a3/DeepSpa/dataset/PDAC/data/EFNA5_EPHA2/data_pca.emd",help="absolute path to pretrained embeddings"
+    )
     parser.add_argument(
         "--pretrained_method", default="node2vec", help="compgcn|node2vec"
     )
@@ -319,7 +216,7 @@ def CCC_Predict(data_name='Sst_Sstr2',data_path='./Example/single-cell/data/',
         default="random",
         help="fine tuning context generation: shortest/all/pattern/random",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(args=[])
 
     # Default values
     args.pretrained_embeddings, args.base_embedding_dim = get_set_embeddings_details(
@@ -327,12 +224,128 @@ def CCC_Predict(data_name='Sst_Sstr2',data_path='./Example/single-cell/data/',
     )
     args.d_model = args.base_embedding_dim
     args.d_ff = args.base_embedding_dim
-    
     args.data_name = data_name
     args.data_path = data_path
     args.outdir = outdir
     args.pretrained_embeddings = pretrained_embeddings
+    args.n_epochs = n_epochs
+    args.ft_n_epochs = ft_n_epochs
     
-    print("Args ", str(args))
+    #print("Args ", str(args))
 
-    main(args)
+    data_path = f"{args.data_path}/{args.data_name}"
+    attr_graph, context_gen = get_graph(args, data_path, args.false_edge_gen)
+    attr_graph.dump_stats()
+    print(attr_graph.G)
+    stime = time.time()
+    id_maps_dir = data_path
+    ent2id = get_id_map(f"{id_maps_dir}/ent2id.txt")
+    rel2id = get_id_map(f"{id_maps_dir}/rel2id.txt")
+    print(len(ent2id), len(rel2id))
+
+    # Load pretrained embedding from CompGCN
+    if args.pretrained_method == "compgcn":
+        pretrained_node_embedding = load_pickle(args.pretrained_embeddings)
+    elif args.pretrained_method == "node2vec":
+        pretrained_node_embedding = load_pretrained_node2vec(
+            args.pretrained_embeddings, ent2id, args.base_embedding_dim
+        )
+
+    print(
+        "No. of nodes with pretrained embedding: ",
+        len(pretrained_node_embedding),
+    )
+
+    valid_path = data_path + "/valid.txt"
+    valid_edges_paths = [valid_path]
+    valid_edges = list(get_test_edges(valid_edges_paths, " "))
+    test_path = data_path + "/test.txt"
+    test_edges_paths = [test_path]
+    test_edges = list(get_test_edges(test_edges_paths, " "))
+    print("No. edges in test data: ", len(test_edges))
+    '''
+    if args.is_pre_trained:
+        link_prediction_eval(
+            valid_edges, test_edges, ent2id, rel2id, pretrained_node_embedding
+        )
+    else:
+        print("No pretrained embedding, no need to evaluate workflow 1.\n")
+    '''
+    outdir = data_path+"/outdir"
+    isExists = os.path.exists(outdir)
+    if isExists:
+        shutil.rmtree(outdir)
+        os.makedirs(outdir)
+    if not isExists:
+        os.makedirs(outdir)
+
+
+    print("***************PRETRAINING***************")
+    pre_num_batches = setup_pretraining_input(args, attr_graph, context_gen, outdir)
+    print("\n Run model for pre-training ...")
+    
+    # Masked nodes prediction
+    pred_data, true_data = run_pretraining(
+        args, attr_graph, pre_num_batches, pretrained_node_embedding, ent2id, rel2id
+    )
+    #print("\n Begin evaluation for node prediction...")
+    # accu, mse = run_evaluation(pred_data, true_data)
+    # Link prediction
+    ft_num_batches = setup_finetuning_input(args, attr_graph, context_gen)
+    print("\n !!!!")
+
+    pred_data, true_data = run_finetuning_wkfl2(
+        args, attr_graph, ft_num_batches, pretrained_node_embedding, ent2id, rel2id
+    )
+    print("\n Begin evaluation for link prediction...")
+    valid_true_data = np.array(true_data["valid"])
+    #print(valid_true_data)
+    #threshold = find_optimal_cutoff(valid_true_data, pred_data["valid"])[0]
+    threshold = 0.5
+    #print(threshold)
+    run_evaluation_main(
+        test_edges, pred_data["test"], true_data["test"], threshold, header="workflow2"
+    )
+    # evaluate_all_epochs(args, attr_graph, ft_num_batches,
+    #                    pretrained_node_embedding, ent2id, rel2id, test_edges)
+    
+    # WORKFLOW_3
+    print("***************FINETUNING***************")
+    print("\n Run model for finetuning ...")
+    (
+        pred_data_test,
+        true_data_test,
+        pred_data_valid,
+        true_data_valid,
+    ) = run_finetuning_wkfl3(
+        args, attr_graph, ft_num_batches, pretrained_node_embedding, ent2id, rel2id
+    )
+    print("\n Begin evaluation for link prediction...")
+    valid_true_data = np.array(true_data_valid)
+    #threshold = 0.5
+
+    #threshold = find_optimal_cutoff(valid_true_data, pred_data_valid)[0]
+    #save the threshold values for later use
+    #json.dump(threshold, open(args.outdir + "/thresholds.json", "w"))
+    y_true,y_scores = run_evaluation_main(
+        test_edges, pred_data_test, true_data_test, threshold, header="workflow3"
+    )
+    #np.save('./out/EFNA5_EPHA2/y_true.npy', y_true)
+    #np.save('./out/EFNA5_EPHA2/y_pred.npy', y_scores)
+    # evaluate after context inference
+
+    etime = time.time()
+    elapsed = etime - stime
+    print(f"running time(seconds) on {args.data_name} data: {elapsed}")
+
+
+
+
+'''
+if __name__ == '__main__':
+
+
+    Train(data_name='Sst_Sstr2',data_path='./Test/single-cell/data/',
+    outdir='./Test/single-cell/data/Sst_Sstr2/output',
+    pretrained_embeddings='./Test/single-cell/data/data_pca.emd')
+'''
