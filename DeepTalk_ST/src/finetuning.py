@@ -38,7 +38,7 @@ class FocalLoss(torch.nn.Module):
 
 def setup_finetuning_input(args, attr_graph, context_gen):
     # finetune
-    print("\n Generate data for finetuning ...")
+    #print("\n Generate data for finetuning ...")
     num_batches = {}
     finetune_path = args.outdir + "/finetune/"
     if not os.path.exists(finetune_path):
@@ -67,16 +67,16 @@ def setup_finetuning_input(args, attr_graph, context_gen):
             finetune_walks_per_task, open(finetune_path + "/finetune_walks.txt", "w")
         )
 
-        print(
-            "Number of train, valid, test",
-            len(train_edges),
-            len(valid_edges),
-            len(test_edges),
-        )
+        #print(
+        #    "Number of train, valid, test",
+        #    len(train_edges),
+        #    len(valid_edges),
+        #    len(test_edges),
+        #)
     num_batches = create_finetune_batches2(
         finetune_walks_per_task, finetune_path, args.data_name, args.ft_batch_size
     )
-    print("No. of batches for finetuning:", num_batches)
+    #print("No. of batches for finetuning:", num_batches)
 
     return num_batches
 
@@ -101,18 +101,18 @@ def run_finetuning_wkfl2(
     )
 
     # process minibatch for finetune(ft)
-    print("\n processing minibaches for finetuning:")
+    #print("\n processing minibaches for finetuning:")
     ft_batch_input_file = os.path.join(
         finetune_path, args.data_name + "_ft_batch_input.pickled"
     )
     if os.path.exists(ft_batch_input_file):
-        print("loading saved files ...")
+        #print("loading saved files ...")
         ft_batch_input = load_pickle(ft_batch_input_file)
     else:
         ft_batch_input = {}
         tasks = ["train", "valid", "test"]
         for task in tasks:
-            print(task)
+            #print(task)
             ft_batch_input[task] = {}
             for batch_id in range(no_batches[task]):
                 (
@@ -151,19 +151,19 @@ def run_finetuning_wkfl2(
         rel2id,
     )
 
-    print("Begin finetuning")
+    #print("Begin finetuning")
     # load pre-trained model
     fbest = open(os.path.join(outdir, "best_epoch_id.txt"), "r")
     for line in fbest:
         tmp = line
     best_epoch = int(tmp[:-1])
-    print("best_epoch: ", best_epoch)
+    #print("best_epoch: ", best_epoch)
     fbest.close()
     if epoch == -1:
         fl_ = os.path.join(outdir, "bert_{}.model".format(best_epoch))
     else:
         fl_ = os.path.join(outdir, "bert_{}.model".format(epoch))
-    print("LOADING PRE_TRAIN model from ", fl_)
+    #print("LOADING PRE_TRAIN model from ", fl_)
     ccc.load_state_dict(
         torch.load(fl_, map_location=lambda storage, loc: storage)
     )
@@ -171,7 +171,7 @@ def run_finetuning_wkfl2(
     # run in fine tuning mode
     ccc.set_fine_tuning()
     # testing
-    print("Begin Testing")
+    #print("Begin Testing")
     ccc.eval()
 
     pred_data = {}
@@ -250,18 +250,18 @@ def run_finetuning_wkfl3(
     )
 
     # process minibatch for finetune(ft)
-    print("\n processing minibaches for finetuning:")
+    #print("\n processing minibaches for finetuning:")
     ft_batch_input_file = os.path.join(
         finetune_path, args.data_name + "_ft_batch_input.pickled"
     )
     if os.path.exists(ft_batch_input_file):
-        print("loading saved files ...")
+        #print("loading saved files ...")
         ft_batch_input = load_pickle(ft_batch_input_file)
     else:
         ft_batch_input = {}
         tasks = ["train", "valid", "test"]
         for task in tasks:
-            print(task)
+            #print(task)
             ft_batch_input[task] = {}
             for batch_id in range(no_batches[task]):
                 (
@@ -317,16 +317,16 @@ def run_finetuning_wkfl3(
     #criterion = torch.nn.BCELoss(reduction="mean")
     optimizer = optim.Adam(ft_linear.parameters(), args.ft_lr,weight_decay=0.0001)
 
-    print("Begin finetuning")
+    #print("Begin finetuning")
     # load pre-trained model
     fbest = open(os.path.join(outdir, "best_epoch_id.txt"), "r")
     for line in fbest:
         tmp = line
     best_epoch = int(tmp[:-1])
-    print("best_epoch in pretraining: ", best_epoch)
+    #print("best_epoch in pretraining: ", best_epoch)
     fbest.close()
     fl_ = os.path.join(outdir, "bert_{}.model".format(best_epoch))
-    print("LOADING PRE_TRAIN model from ", fl_)
+    #print("LOADING PRE_TRAIN model from ", fl_)
     ccc.load_state_dict(
         torch.load(fl_, map_location=lambda storage, loc: storage)
     )
@@ -339,7 +339,6 @@ def run_finetuning_wkfl3(
     for epoch in range(args.ft_n_epochs):
         loss_arr = []
         loss_dev_min = 1e6
-        print("\nFinetune epoch: ", epoch)
         start_time = time.time()
         for batch_id in range(no_batches["train"]):
             subgraphs, all_nodes, labels = walk_processor.process_finetune_minibatch(
@@ -443,6 +442,7 @@ def run_finetuning_wkfl3(
                 ccc.train()
                 ft_linear.train()
         loss_dev_final.append(loss_dev_min)
+        print("\nFinetune epoch: ", epoch)
         print("MinLoss: ", np.around(loss_dev_min, 4))
         end_time = time.time()
         print("epoch time: (s)", (end_time - start_time))

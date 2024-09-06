@@ -45,7 +45,7 @@ def setup_pretraining_input(args, attr_graph, context_gen, data_path):
                 walk_test = walk_data
     else:
         # generate walks
-        print("\n Generating subgraphs for pre-training ...")
+        #print("\n Generating subgraphs for pre-training ...")
         all_walks = context_gen.get_pretrain_subgraphs(
             data_path,
             args.data_name,
@@ -53,11 +53,11 @@ def setup_pretraining_input(args, attr_graph, context_gen, data_path):
             args.max_length,
             args.walk_type,
         )
-        print("\n split data to train/validate/test and save the files ...")
+        #print("\n split data to train/validate/test and save the files ...")
         walk_train, walk_validate, walk_test = split_data(
             all_walks, data_path, args.data_name
         )
-    print(len(walk_train), len(walk_validate), len(walk_test))
+    #print(len(walk_train), len(walk_validate), len(walk_test))
 
     # create batches
     num_batches = {}
@@ -72,7 +72,7 @@ def setup_pretraining_input(args, attr_graph, context_gen, data_path):
             walk_data, data_path, args.data_name, task, args.batch_size
         )
         num_batches[task] = cnt
-    print("number of batches for pre-training: ", num_batches)
+    #print("number of batches for pre-training: ", num_batches)
     return num_batches
 
 
@@ -92,22 +92,22 @@ def run_pretraining(
     relations = attr_graph.relation_to_id
     #no_relations = attr_graph.get_number_of_relations()
     nodeid2rowid = attr_graph.get_nodeid2rowid()
-    print(attr_graph.get_number_of_nodes())
+    #print(attr_graph.get_number_of_nodes())
     #no_nodes = attr_graph.get_number_of_nodes()
     walk_processor = Processing_GCN_Walks(
         nodeid2rowid, relations, args.n_pred, args.max_length, args.max_pred
     )
 
-    print("\n processing walks in minibaches before running model:")
+    #print("\n processing walks in minibaches before running model:")
     batch_input_file = os.path.join(data_path, args.data_name + "_batch_input.pickled")
     if os.path.exists(batch_input_file):
-        print("loading saved files ...")
+        #print("loading saved files ...")
         batch_input = load_pickle(batch_input_file)
     else:
         batch_input = {}
         tasks = ["train", "validate", "test"]
         for task in tasks:
-            print(task)
+            #print(task)
             batch_input[task] = {}
             for batch_id in range(no_batches[task]):
                 (
@@ -165,7 +165,7 @@ def run_pretraining(
     for epoch in range(args.n_epochs):
         loss_arr = []
         loss_dev_min = 1e6
-        print("\nEpoch: {}".format(epoch))
+
         start_time = time.time()
         for batch_id in range(no_batches["train"]):
             (
@@ -264,12 +264,13 @@ def run_pretraining(
 
                         loss_dev_arr.append(loss.data.cpu().numpy().tolist())
                     loss_dev_avg = np.average(loss_dev_arr)
-
-                print(
-                    "MinLoss: {}, CurLoss: {}".format(
-                        np.around(loss_dev_min, 4), np.around(loss_dev_avg, 4)
+                if epoch%10==0:
+                    print("\nEpoch: {}".format(epoch))
+                    print(
+                        "MinLoss: {}, CurLoss: {}".format(
+                            np.around(loss_dev_min, 4), np.around(loss_dev_avg, 4)
+                        )
                     )
-                )
                 if loss_dev_avg < loss_dev_min:
                     loss_dev_min = loss_dev_avg
                     fmodel = open(
@@ -284,9 +285,10 @@ def run_pretraining(
                 #    epoch = args.n_epochs + 1
 
         loss_dev_final.append(loss_dev_min)
-        print("MinLoss: ", np.around(loss_dev_min, 4))
+        #print("MinLoss: ", np.around(loss_dev_min, 4))
         end_time = time.time()
-        print("epoch time: (s)", (end_time - start_time))
+        if epoch%10==0:
+            print("epoch time: (s)", (end_time - start_time))
 
     best_epoch = np.argsort(loss_dev_final)[0]
     print("\nBest Epoch: {}".format(best_epoch))
@@ -295,7 +297,7 @@ def run_pretraining(
     fbest.close()
     np.save(f"{args.outdir}/pretraining_loss.npy", loss_dev_final)
 
-    print("Begin Testing")
+    #print("Begin Testing")
     ccc.eval()
     fl_ = os.path.join(out_dir, "bert_{}.model".format(best_epoch))
     ccc.load_state_dict(

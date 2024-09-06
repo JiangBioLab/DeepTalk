@@ -263,7 +263,7 @@ class CCC(torch.nn.Module):
                 -1, -1, output.size(-1)
             )  # [batch_size, maxlen, d_model]
             h_masked = torch.gather(
-                output, 1, masked_pos.to(self.device)
+                output, 1, masked_pos.to(torch.int64).to(self.device)
             )  # masking position [batch_size, len, d_model]
             h_masked = self.norm(gelu(self.linear(h_masked)))
             pred_score = self.decoder(h_masked)  # [batch_size, maxlen, n_vocab]
